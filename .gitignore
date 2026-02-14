@@ -1,0 +1,36 @@
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Virtual Environment ──────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Secrets & Credentials ────────────────────────────────
+.env
+credentials.json
+token.json
+
+# ── IDE / Editor ─────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Jupyter Notebook ─────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── OS Files ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+nul
+
+# ── Claude Code ──────────────────────────────────────────
+.claude/

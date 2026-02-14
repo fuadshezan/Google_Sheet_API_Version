@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Aesthetico Dashboard</title>
+
+    <!-- Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .login-header {
+            text-align: center;
+            padding: 32px 32px 16px;
+        }
+
+        .login-header i {
+            font-size: 3rem;
+            color: #0d6efd;
+        }
+
+        .login-body {
+            padding: 16px 32px 32px;
+        }
+
+        .form-floating > .form-control {
+            border-radius: 10px;
+        }
+
+        .btn-login {
+            border-radius: 10px;
+            padding: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .alert {
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card login-card">
+        <div class="login-header">
+            <i class="bi bi-grid-3x3-gap-fill"></i>
+            <h3 class="mt-2 mb-1">Aesthetico</h3>
+            <p class="text-muted mb-0">Sign in to your dashboard</p>
+        </div>
+
+        <div class="login-body">
+            <!-- Error alert (hidden by default) -->
+            <div class="alert alert-danger d-none" id="errorAlert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <span id="errorMessage"></span>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-floating mb-3">
+                    <input type="email" class="form-control" id="email" placeholder="name@example.com" required autofocus>
+                    <label for="email"><i class="bi bi-envelope me-1"></i> Email address</label>
+                </div>
+
+                <div class="form-floating mb-4">
+                    <input type="password" class="form-control" id="password" placeholder="Password" required>
+                    <label for="password"><i class="bi bi-lock me-1"></i> Password</label>
+                </div>
+
+                <button class="btn btn-primary btn-login w-100" type="submit" id="btnLogin">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5.3 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const API = "";
+
+        // If already logged in, redirect to dashboard
+        (function checkAuth() {
+            const token = localStorage.getItem("auth_token");
+            if (token) {
+                // Verify token is still valid
+                fetch(`${API}/api/me`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                })
+                .then(res => {
+                    if (res.ok) {
+                        window.location.href = "/";
+                    }
+                })
+                .catch(() => {
+                    // Token invalid, stay on login
+                    localStorage.removeItem("auth_token");
+                    localStorage.removeItem("auth_user");
+                });
+            }
+        })();
+
+        async function handleLogin(e) {
+            e.preventDefault();
+
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value;
+            const btn = document.getElementById("btnLogin");
+            const errorAlert = document.getElementById("errorAlert");
+            const errorMessage = document.getElementById("errorMessage");
+
+            // Hide previous error
+            errorAlert.classList.add("d-none");
+
+            // Show loading state
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in...';
+
+            try {
+                const res = await fetch(`${API}/api/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, password }),
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.detail || "Login failed. Please try again.");
+                }
+
+                // Store auth data in localStorage
+                localStorage.setItem("auth_token", data.token);
+                localStorage.setItem("auth_user", JSON.stringify({
+                    username: data.username,
+                    email: data.email,
+                    role: data.role,
+                }));
+
+                // Redirect to dashboard
+                window.location.href = "/";
+
+            } catch (err) {
+                errorMessage.textContent = err.message;
+                errorAlert.classList.remove("d-none");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        }
+    </script>
+</body>
+</html>

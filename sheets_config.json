@@ -1,0 +1,82 @@
+{
+    "_comment": "Sheet-wise configuration. header_row = which row has column headers (1-based). columns = column range to read (e.g. 'A:F'). visible = show in frontend (default true). roles = which roles can access ['admin','moderator'] (default all roles).",
+
+    "DASHBOARD": {
+        "header_row": 3,
+        "columns": "A:F",
+        "visible": false
+    },
+    "Inventory": {
+        "header_row": 1,
+        "columns": "A:O",
+        "visible": true,
+        "roles": ["admin", "moderator"],
+        "image_columns": ["Product Image"],
+        "role_columns": {
+            "moderator": ["Product ID", "Product Image", "Product Name", "Design", "Color", "Size ", "Selling Price", "Available Stock", "Display Name"]
+        }
+    },
+    "Summary Inventory": {
+        "header_row": 6,
+        "columns": "A:F",
+        "visible": true,
+        "roles": ["admin", "moderator"]
+    },
+    "Input Inventory": {
+        "header_row": 1,
+        "columns": "A:E",
+        "visible": true,
+        "roles": ["admin"]
+    },
+    "Sales": {
+        "header_row": 1,
+        "columns": "A:R",
+        "visible": true,
+        "roles": ["admin", "moderator"]
+    },
+    "Sales Raw": {
+        "header_row": 1,
+        "columns": "A:O",
+        "visible": true,
+        "roles": ["admin"]
+    },
+    "Expenses": {
+        "header_row": 1,
+        "columns": "A:E",
+        "visible": true,
+        "roles": ["admin"]
+    },
+    "Product Purchase": {
+        "header_row": 1,
+        "columns": "A:J",
+        "visible": true,
+        "roles": ["admin"]
+    },
+    "DashBoard Calculation": {
+        "header_row": 3,
+        "columns": "A:D",
+        "visible": false
+    },
+    "Daily Inventory": {
+        "header_row": 1,
+        "columns": "A:E",
+        "visible": false,
+        "roles": ["admin", "moderator"]
+    },
+    "Reference Inventory": {
+        "header_row": 1,
+        "columns": "A:O",
+        "visible": false
+    },
+    "Information": {
+        "header_row": 1,
+        "columns": "A:C",
+        "visible": true,
+        "roles": ["admin", "moderator"]
+    },
+    "UserName": {
+        "header_row": 1,
+        "columns": "A:E",
+        "visible": false
+    }
+}
