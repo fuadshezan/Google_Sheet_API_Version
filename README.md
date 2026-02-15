@@ -1,13 +1,14 @@
-# Aesthetico - Order Status Automation
+# Aesthetico - Order Management Dashboard
 
-A Python automation tool that connects to a Google Spreadsheet, reads sales order data, fetches real-time delivery statuses from **Pathao** and **Steadfast** courier APIs, and updates the spreadsheet automatically.
+A full-stack web application for managing orders, inventory, and delivery statuses. Built with FastAPI backend and vanilla JavaScript frontend, integrated with Google Sheets for data storage and Pathao/Steadfast courier APIs for real-time delivery tracking.
 
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [How It Works](#how-it-works)
+- [Features](#features)
+- [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
@@ -17,19 +18,20 @@ A Python automation tool that connects to a Google Spreadsheet, reads sales orde
   - [Pathao Courier Setup](#2-pathao-courier-setup)
   - [Steadfast Courier Setup](#3-steadfast-courier-setup)
   - [Environment Variables](#4-environment-variables)
+  - [Sheets Configuration](#5-sheets-configuration)
+  - [User Management](#6-user-management)
 - [Usage](#usage)
-  - [Run the Full Pipeline](#run-the-full-pipeline)
-  - [Test Google Sheets Connection](#test-google-sheets-connection)
-  - [Use Individual Modules](#use-individual-modules)
-  - [Use in Jupyter Notebook](#use-in-jupyter-notebook)
+  - [Running the Application](#running-the-application)
+  - [Testing Components](#testing-components)
 - [API Reference](#api-reference)
-  - [PathaoCourier](#pathaocourier)
-  - [SteadfastCourier](#steadfastcourier)
-  - [update_order_status Functions](#update_order_status-functions)
-- [Delivery Platform Routing](#delivery-platform-routing)
+  - [Authentication](#authentication)
+  - [Sheet Operations](#sheet-operations)
+  - [Order Management](#order-management)
+  - [Status Updates](#status-updates)
+- [Role-Based Access Control](#role-based-access-control)
+- [Image Handling](#image-handling)
 - [Token Management (Pathao)](#token-management-pathao)
 - [Error Handling](#error-handling)
-- [Google Sheet Structure](#google-sheet-structure)
 - [Security Notes](#security-notes)
 - [Troubleshooting](#troubleshooting)
 
@@ -37,55 +39,112 @@ A Python automation tool that connects to a Google Spreadsheet, reads sales orde
 
 ## Overview
 
-This project automates the process of checking delivery statuses for orders placed through Pathao and Steadfast courier services. Instead of manually logging into each courier's dashboard and checking statuses one by one, this tool:
+This application provides a modern web interface for managing an e-commerce business through Google Sheets. It replaces manual spreadsheet access with a role-based dashboard that:
 
-1. Reads all orders from a Google Sheet
-2. Identifies which orders have a consignment ID (meaning they've been dispatched)
-3. Detects the courier service from the "Delivery Platform" column
-4. Calls the correct courier API to get the current delivery status
-5. Writes the updated status back to the Google Sheet
+- **Authenticates users** via JWT tokens with role-based permissions
+- **Displays Google Sheet data** in searchable, sortable DataTables
+- **Filters columns** based on user roles (admin/moderator)
+- **Renders product images** with hover zoom
+- **Inserts new orders** directly to Sales Raw sheet
+- **Auto-updates delivery statuses** from Pathao/Steadfast APIs
+- **Tracks user activity** (last active timestamps)
 
 ---
 
-## How It Works
+## Features
+
+### Authentication & Authorization
+- JWT-based authentication with secure token storage
+- Role-based access control (Admin, Moderator)
+- Automatic token validation and refresh
+- User session tracking
+
+### Sheet Management
+- Dynamic sheet listing based on user role
+- Configurable header rows and column ranges
+- Column visibility control per role
+- Real-time data refresh
+
+### Order Management
+- **Insert Orders**: Add new orders with multiple products to Sales Raw sheet
+- **Product Search**: Select2-powered searchable product dropdowns
+- **Auto-calculations**: Order IDs, Product IDs, prices, and status formulas auto-generated
+- **Date formatting**: Automatic date conversion for sheet compatibility
+
+### Delivery Status Automation
+- Automatic detection of courier service (Pathao/Steadfast) from "Delivery Platform" column
+- Real-time status fetching via courier APIs
+- Bulk update of Order Status column
+- Admin-only access to status update functionality
+
+### Image Support
+- Automatic image detection in configured columns
+- Thumbnail display in tables
+- Hover zoom preview (320x380px popup)
+- Support for direct URLs, Google Drive, Cloudinary, Imgur
+
+### UI/UX Features
+- Responsive sidebar navigation
+- Bootstrap 5.3 modern design
+- DataTables integration (search, sort, pagination)
+- Toast notifications for user feedback
+- Loading overlays with status text
+- Empty state placeholders
+
+---
+
+## Architecture
 
 ```
-Google Sheet (Sales)
-        |
-        v
-  Read all orders
-        |
-        v
-  Filter: has Consignment ID?
-        |
-   +---------+---------+
-   |                   |
-   v                   v
-Pathao API        Steadfast API
-(order_status)    (delivery_status)
-   |                   |
-   +---------+---------+
-             |
-             v
-   Update Google Sheet
-   (Order Status column)
+┌─────────────┐         ┌──────────────┐         ┌─────────────────┐
+│   Browser   │◄───────►│  FastAPI     │◄───────►│  Google Sheets  │
+│  (JS/HTML)  │  HTTP   │   Backend    │  gspread│    (Data)       │
+└─────────────┘         └──────┬───────┘         └─────────────────┘
+                               │
+                    ┌──────────┴──────────┐
+                    │                     │
+                    ▼                     ▼
+            ┌──────────────┐      ┌──────────────┐
+            │   Pathao     │      │  Steadfast   │
+            │   API        │      │   API        │
+            └──────────────┘      └──────────────┘
 ```
+
+**Flow:**
+1. User logs in → Backend validates credentials from UserName sheet → Issues JWT token
+2. Frontend requests sheet list → Backend filters by role → Returns accessible sheets
+3. User selects sheet → Backend fetches data → Applies column filters → Returns JSON
+4. Frontend renders data in DataTables with image support
+5. Admin clicks "Update Statuses" → Backend reads Sales sheet → Calls courier APIs → Updates sheet
+6. User inserts order → Backend validates → Writes to Sales Raw → Formulas auto-calculate
 
 ---
 
 ## Tech Stack
 
+### Backend
 | Technology | Purpose | Version |
 |---|---|---|
 | **Python** | Core language | 3.13+ |
+| **FastAPI** | Web framework | Latest |
+| **Uvicorn** | ASGI server | Latest |
 | **gspread** | Google Sheets API wrapper | 6.2.1 |
-| **google-auth** | Google service account authentication | 2.48.0 |
+| **google-auth** | Service account authentication | 2.48.0 |
+| **PyJWT** | JWT token generation/validation | Latest |
 | **requests** | HTTP client for courier APIs | 2.32.4 |
-| **pandas** | Data manipulation and filtering | 2.3.0 |
-| **python-dotenv** | Load environment variables from `.env` | 1.1.1 |
+| **pandas** | Data manipulation | 2.3.0 |
+| **python-dotenv** | Environment variables | 1.1.1 |
+
+### Frontend
+| Technology | Purpose |
+|---|---|
+| **Vanilla JavaScript** | Client-side logic |
+| **Bootstrap 5.3** | UI framework |
+| **DataTables** | Table rendering with search/sort |
+| **Select2** | Enhanced dropdowns |
+| **Bootstrap Icons** | Icon library |
 
 ### External APIs
-
 | API | Authentication | Documentation |
 |---|---|---|
 | **Google Sheets API** | Service Account (OAuth2) | [Google Sheets API Docs](https://developers.google.com/sheets/api) |
@@ -98,18 +157,29 @@ Pathao API        Steadfast API
 
 ```
 Google sheet using python/
-|
-|-- credentials.json          # Google service account credentials (DO NOT COMMIT)
-|-- .env                      # Courier API credentials (DO NOT COMMIT)
-|-- token.json                # Pathao cached token (auto-generated, DO NOT COMMIT)
-|
-|-- connect_sheet.py          # Test script - verify Google Sheets connection
-|-- pathao_courier.py         # Pathao API client with token management
-|-- steadfast_courier.py      # Steadfast API client
-|-- update_order_status.py    # Main pipeline - read, fetch, update
-|-- test.ipynb                # Jupyter notebook for experimentation
-|
-|-- README.md                 # This file
+│
+├── main.py                    # FastAPI application entry point
+├── auth_service.py            # JWT token creation/verification
+├── sheets_service.py          # Google Sheets operations & role filtering
+├── pathao_courier.py          # Pathao API client with OAuth2
+├── steadfast_courier.py       # Steadfast API client
+├── update_order_status.py     # Standalone status update pipeline
+│
+├── credentials.json           # Google service account (DO NOT COMMIT)
+├── .env                       # API credentials (DO NOT COMMIT)
+├── token.json                 # Pathao cached tokens (auto-generated, DO NOT COMMIT)
+├── sheets_config.json         # Sheet configuration (header rows, columns, roles)
+│
+├── static/
+│   ├── index.html            # Main dashboard page
+│   ├── login.html            # Login page
+│   └── js/
+│       └── app.js            # Frontend JavaScript
+│
+├── test.ipynb                # Jupyter notebook for testing
+├── connect_sheet.py          # Google Sheets connection test
+├── README.md                 # This file
+└── .gitignore                # Excludes credentials, .env, token.json
 ```
 
 ---
@@ -118,9 +188,14 @@ Google sheet using python/
 
 - **Python 3.10+** installed
 - **Google Cloud Project** with Sheets API and Drive API enabled
-- **Google Service Account** with a JSON credentials file
+- **Google Service Account** with JSON credentials
 - **Pathao Merchant Account** with API credentials
 - **Steadfast Merchant Account** with API key and secret key
+- **Google Spreadsheet** with these sheets:
+  - `UserName` (for authentication)
+  - `Sales` (main orders data)
+  - `Sales Raw` (order insertion target)
+  - `Inventory` (product data)
 
 ---
 
@@ -135,13 +210,13 @@ cd "your/project/directory"
 ### 2. Install Python dependencies
 
 ```bash
-pip install gspread google-auth python-dotenv requests pandas
+pip install fastapi uvicorn gspread google-auth python-dotenv requests pandas pyjwt
 ```
 
-Or install all at once with a requirements file:
+Or with specific versions:
 
 ```bash
-pip install gspread==6.2.1 google-auth==2.48.0 python-dotenv==1.1.1 requests==2.32.4 pandas==2.3.0
+pip install fastapi==0.109.0 uvicorn==0.27.0 gspread==6.2.1 google-auth==2.48.0 python-dotenv==1.1.1 requests==2.32.4 pandas==2.3.0 pyjwt==2.8.0
 ```
 
 ---
@@ -153,43 +228,43 @@ pip install gspread==6.2.1 google-auth==2.48.0 python-dotenv==1.1.1 requests==2.
 #### Create a Service Account
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or select an existing one)
-3. Enable the **Google Sheets API** and **Google Drive API**
+2. Create a new project or select an existing one
+3. Enable **Google Sheets API** and **Google Drive API**
 4. Go to **IAM & Admin > Service Accounts**
 5. Click **Create Service Account**
-6. Give it a name (e.g., `sheet-accessor`)
+6. Name it (e.g., `sheet-accessor`)
 7. Click **Create and Continue** (skip optional steps)
-8. Go to the service account > **Keys** tab > **Add Key** > **Create new key** > **JSON**
-9. Download the JSON file and rename it to `credentials.json`
-10. Place it in the project root directory
+8. Go to the service account → **Keys** tab → **Add Key** → **Create new key** → **JSON**
+9. Download and rename to `credentials.json`
+10. Place it in the project root
 
 #### Share the Spreadsheet
 
 1. Open your Google Spreadsheet
-2. Click the **Share** button (top-right)
-3. Add the service account email (found in `credentials.json` under `client_email`)
+2. Click **Share** (top-right)
+3. Add the service account email from `credentials.json` (`client_email` field)
    ```
    your-service-account@your-project.iam.gserviceaccount.com
    ```
-4. Set the role to **Editor**
+4. Set role to **Editor**
 5. Click **Send**
 
 ### 2. Pathao Courier Setup
 
-1. Log in to the [Pathao Merchant Panel](https://merchant.pathao.com/)
+1. Log in to [Pathao Merchant Panel](https://merchant.pathao.com/)
 2. Go to **Developer API** settings
-3. Note your **Client ID**, **Client Secret**
+3. Note your **Client ID** and **Client Secret**
 4. Your login **email** and **password** are also required
 
 ### 3. Steadfast Courier Setup
 
-1. Log in to the [Steadfast Portal](https://portal.packzy.com/)
+1. Log in to [Steadfast Portal](https://portal.packzy.com/)
 2. Go to **API Settings**
 3. Note your **API Key** and **Secret Key**
 
 ### 4. Environment Variables
 
-Create a `.env` file in the project root:
+Create `.env` file in project root:
 
 ```env
 # Pathao Courier
@@ -203,297 +278,433 @@ PATHAO_PASSWORD=your_password
 STEADFAST_BASE_URL=https://portal.packzy.com/api/v1
 STEADFAST_API_KEY=your_api_key
 STEADFAST_SECRET_KEY=your_secret_key
+
+# JWT Secret (generate a random 32+ character string)
+JWT_SECRET_KEY=your-super-secret-jwt-key-here-change-this
 ```
+
+### 5. Sheets Configuration
+
+Create/edit [`sheets_config.json`](sheets_config.json):
+
+```json
+{
+  "_comment": "Configuration for Google Sheets access",
+  
+  "Sales": {
+    "header_row": 1,
+    "columns": "A:R",
+    "visible": true,
+    "roles": ["admin", "moderator"],
+    "role_columns": {
+      "moderator": ["Order ID", "Date", "Customer Name", "Product ID", "Quantity", "Order Status"]
+    },
+    "image_columns": []
+  },
+  
+  "Inventory": {
+    "header_row": 1,
+    "columns": null,
+    "visible": true,
+    "roles": ["admin"],
+    "image_columns": ["Product Image"]
+  },
+  
+  "Sales Raw": {
+    "header_row": 1,
+    "visible": true,
+    "roles": ["admin"]
+  }
+}
+```
+
+**Configuration options:**
+- `header_row`: Row number where headers start (default: 1)
+- `columns`: Column range to read (e.g., `"A:R"` or `null` for all)
+- `visible`: Show in sidebar (default: `true`)
+- `roles`: List of roles that can access this sheet (`null` = all roles)
+- `role_columns`: Column filters per role (only these columns shown to that role)
+- `image_columns`: Columns to treat as image URLs (thumbnail + zoom)
+
+### 6. User Management
+
+Create a `UserName` sheet in your Google Spreadsheet with these columns:
+
+| Username | Email | Password | Role | lastActive |
+|---|---|---|---|---|
+| Admin | admin@example.com | secure_password_123 | admin | 2026-01-15 10:30:00 |
+| John | moderator@example.com | password456 | moderator | 2026-01-14 15:45:00 |
+
+**Notes:**
+- Passwords are stored **plain text** (for demo purposes only)
+- `lastActive` is auto-updated on each login
+- Role values: `admin` or `moderator`
 
 ---
 
 ## Usage
 
-### Run the Full Pipeline
+### Running the Application
 
-This reads the Sales sheet, fetches statuses from Pathao/Steadfast, and updates the Google Sheet:
+Start the FastAPI server:
 
 ```bash
-python update_order_status.py
+python main.py
 ```
 
-**Example output:**
+Or with Uvicorn directly:
 
-```
-=== Step 1: Reading Sales Sheet ===
-  175 rows loaded.
-
-=== Step 2: Filtering rows with Consignment ID ===
-Found 2 row(s) with Consignment ID
-
-=== Step 3: Fetching statuses (auto-detect Pathao / Steadfast) ===
-  ORD#20260201-01478 | Pathao | DA010226MAN7CG -> Delivered
-  ORD#20260201-01481 | Pathao | DA010226BYHR3Y -> Delivered
-
-=== Step 4: Updating Google Sheet ===
-  Row 173: ORD#20260201-01478 -> 'Delivered'
-  Row 176: ORD#20260201-01481 -> 'Delivered'
-
-  Updated 2 cell(s) on Google Sheet.
-
-Done!
+```bash
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### Test Google Sheets Connection
+**Access the application:**
+- Dashboard: http://127.0.0.1:8000
+- Login: http://127.0.0.1:8000/login
+- API Docs: http://127.0.0.1:8000/docs
 
-To verify your `credentials.json` is working and the spreadsheet is accessible:
+**Default workflow:**
+1. Navigate to http://127.0.0.1:8000 → Redirects to login if not authenticated
+2. Enter credentials from UserName sheet
+3. Dashboard loads with accessible sheets in sidebar
+4. Click sheet name to view data
+5. (Admin only) Click "Update Order Statuses" to fetch delivery statuses
+6. (Admin only, Sales Raw) Click "Insert Order" to add new orders
 
+### Testing Components
+
+**Test Google Sheets connection:**
 ```bash
 python connect_sheet.py
 ```
 
-### Test Courier APIs Standalone
-
+**Test Pathao API standalone:**
 ```bash
-# Pathao - by consignment ID
 python pathao_courier.py DA010226MAN7CG
+```
 
-# Steadfast - by consignment ID (numeric)
+**Test Steadfast API standalone:**
+```bash
 python steadfast_courier.py 123456
 ```
 
-### Use Individual Modules
-
-Each module can be imported and used independently:
-
-```python
-# Pathao
-from pathao_courier import PathaoCourier
-
-pathao = PathaoCourier()
-order = pathao.get_order_info("DA010226MAN7CG")
-print(order["order_status"])  # "Delivered"
-```
-
-```python
-# Steadfast
-from steadfast_courier import SteadfastCourier
-
-sf = SteadfastCourier()
-order = sf.get_order_by_consignment("123456")
-print(order["delivery_status"])  # "delivered"
-```
-
-```python
-# Full pipeline functions
-from update_order_status import get_sales_sheet, get_rows_with_consignment, fetch_statuses, update_sheet_statuses
-
-sheet, df = get_sales_sheet()
-filtered = get_rows_with_consignment(df)
-statuses = fetch_statuses(filtered)
-update_sheet_statuses(sheet, df, statuses)
-```
-
-### Use in Jupyter Notebook
-
-```python
-from pathao_courier import PathaoCourier
-from steadfast_courier import SteadfastCourier
-from update_order_status import *
-
-# Run the full pipeline
-run()
-
-# Or use step by step
-sheet, df = get_sales_sheet()
-df_with_consignment = get_rows_with_consignment(df)
-status_map = fetch_statuses(df_with_consignment)
-update_sheet_statuses(sheet, df, status_map)
+**Run standalone status update pipeline:**
+```bash
+python update_order_status.py
 ```
 
 ---
 
 ## API Reference
 
-### PathaoCourier
+### Authentication
 
-```python
-from pathao_courier import PathaoCourier
-```
+#### POST `/api/login`
+Login and get JWT token.
 
-| Method | Parameters | Returns | Description |
-|---|---|---|---|
-| `PathaoCourier()` | None | Instance | Creates client, authenticates automatically |
-| `.get_order_info(consignment_id)` | `str` | `dict` or `None` | Get order details by Pathao consignment ID |
-
-**Response fields** (from `get_order_info`):
-
-The returned `dict` contains Pathao order data including `order_status`, `delivery_fee`, `cod_amount`, etc.
-
-**Custom Exceptions:**
-
-| Exception | When |
-|---|---|
-| `PathaoAuthError` | Authentication fails (bad credentials, network error) |
-| `EnvironmentError` | Missing `.env` variables |
-
-### SteadfastCourier
-
-```python
-from steadfast_courier import SteadfastCourier
-```
-
-| Method | Parameters | Returns | Description |
-|---|---|---|---|
-| `SteadfastCourier()` | None | Instance | Creates client, validates credentials |
-| `.get_order_by_consignment(id)` | `str` (numeric) | `dict` or `None` | Get order by consignment ID |
-| `.get_order_by_invoice(invoice)` | `str` | `dict` or `None` | Get order by invoice ID |
-| `.get_order_by_tracking(code)` | `str` | `dict` or `None` | Get order by tracking code |
-
-**Response fields:**
-
+**Request:**
 ```json
 {
-  "status": 200,
-  "delivery_status": "delivered"
+  "email": "admin@example.com",
+  "password": "secure_password_123"
 }
 ```
 
-**Possible `delivery_status` values:**
-
-`pending`, `in_review`, `delivered`, `delivered_approval_pending`, `partial_delivered`, `partial_delivered_approval_pending`, `cancelled`, `cancelled_approval_pending`, `hold`, `unknown`, `unknown_approval_pending`
-
-### update_order_status Functions
-
-```python
-from update_order_status import *
+**Response:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "username": "Admin",
+  "email": "admin@example.com",
+  "role": "admin"
+}
 ```
 
-| Function | Returns | Description |
-|---|---|---|
-| `get_sales_sheet()` | `(worksheet, DataFrame)` | Reads the Sales sheet into a pandas DataFrame |
-| `get_rows_with_consignment(df)` | `DataFrame` | Filters rows that have a Consignment ID |
-| `fetch_statuses(df)` | `dict` | Fetches statuses from Pathao/Steadfast based on Delivery Platform |
-| `update_sheet_statuses(sheet, df, status_map)` | `None` | Writes updated statuses back to the Google Sheet |
-| `run()` | `None` | Runs the full pipeline (Steps 1-4) |
+#### GET `/api/me`
+Get current user info from token.
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response:**
+```json
+{
+  "username": "Admin",
+  "email": "admin@example.com",
+  "role": "admin"
+}
+```
+
+### Sheet Operations
+
+#### GET `/api/sheets`
+List sheets accessible to current user.
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response:**
+```json
+{
+  "sheets": [
+    {
+      "name": "Sales",
+      "header_row": 1,
+      "columns": "A:R"
+    },
+    {
+      "name": "Inventory",
+      "header_row": 1,
+      "columns": null
+    }
+  ]
+}
+```
+
+#### GET `/api/sheets/{sheet_name}`
+Get data from a specific sheet.
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response:**
+```json
+{
+  "headers": ["Order ID", "Date", "Customer Name", "Product ID", "Quantity"],
+  "rows": [
+    ["ORD#20260201-01478", "2/1/2026", "John Doe", "PRD-023", "1"],
+    ["ORD#20260201-01481", "2/1/2026", "Jane Smith", "PRD-008", "1"]
+  ],
+  "config": {
+    "header_row": 1,
+    "columns": "A:R",
+    "visible": true,
+    "roles": ["admin", "moderator"]
+  },
+  "image_columns": ["Product Image"]
+}
+```
+
+#### GET `/api/config`
+Get full sheets configuration (admin only).
+
+**Headers:** `Authorization: Bearer {token}`
+
+### Order Management
+
+#### GET `/api/products`
+Get list of products from Inventory sheet (for dropdown).
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response:**
+```json
+{
+  "products": [
+    "Product Name 1",
+    "Product Name 2",
+    "Product Name 3"
+  ]
+}
+```
+
+#### POST `/api/sales-raw/insert`
+Insert new order(s) to Sales Raw sheet.
+
+**Headers:** 
+- `Authorization: Bearer {token}`
+- `Content-Type: application/json`
+
+**Request:**
+```json
+{
+  "date": "1-Feb-2026",
+  "customer_name": "John Doe",
+  "customer_contact": "01712345678",
+  "customer_address": "123 Main St, Dhaka",
+  "customer_type": "Regular",
+  "products": [
+    {
+      "product_details": "Product Name 1",
+      "quantity": 2
+    },
+    {
+      "product_details": "Product Name 2",
+      "quantity": 1
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Order inserted successfully! 2 row(s) added to Sales Raw.",
+  "sl_no": 1234,
+  "rows_added": 2
+}
+```
+
+### Status Updates
+
+#### POST `/api/update-statuses`
+Update delivery statuses from courier APIs (admin only).
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Response:**
+```json
+{
+  "total_rows": 175,
+  "with_consignment": 2,
+  "updated": 2,
+  "details": [
+    {
+      "order_id": "ORD#20260201-01478",
+      "status": "Delivered",
+      "row": 173
+    },
+    {
+      "order_id": "ORD#20260201-01481",
+      "status": "Delivered",
+      "row": 176
+    }
+  ],
+  "errors": []
+}
+```
 
 ---
 
-## Delivery Platform Routing
+## Role-Based Access Control
 
-The `Delivery Platform` column in the Sales sheet determines which courier API is called:
+### Admin Role
+- Access to **all sheets** defined in [`sheets_config.json`](sheets_config.json)
+- See **all columns** in each sheet
+- Can **insert orders** to Sales Raw
+- Can **update delivery statuses**
+- Can view full sheets configuration
 
-| Delivery Platform Value | Courier API | Status Field |
-|---|---|---|
-| `Pathao Inside` | Pathao | `order_status` |
-| `Pathao Outside` | Pathao | `order_status` |
-| `Pathao Subcity` | Pathao | `order_status` |
-| `Steadfast Inside` | Steadfast | `delivery_status` |
-| `Steadfast Outside` | Steadfast | `delivery_status` |
-| `Steadfast Subcity` | Steadfast | `delivery_status` |
-| `Personal Dev` | **Skipped** | - |
-| Any other value | **Skipped** | - |
+### Moderator Role
+- Access to sheets where `"roles": ["admin", "moderator"]` or `"roles": null`
+- See only columns listed in `"role_columns": { "moderator": [...] }`
+- **Cannot** insert orders
+- **Cannot** update delivery statuses
+- **Cannot** view sheets configuration
 
-Courier clients are **lazy-loaded** - they are only initialized if at least one row needs them.
+### Implementation
+Role filtering happens in two places:
+1. **Sheet list** ([`sheets_service.py`](sheets_service.py) → `get_sheets_for_role()`)
+2. **Column filtering** ([`sheets_service.py`](sheets_service.py) → `filter_columns_for_role()`)
+
+Frontend also hides UI elements (Insert Order, Update Statuses buttons) based on role stored in [`authUser`](static/js/app.js).
+
+---
+
+## Image Handling
+
+### Configuration
+List image columns in [`sheets_config.json`](sheets_config.json):
+
+```json
+{
+  "Inventory": {
+    "image_columns": ["Product Image", "Thumbnail"]
+  }
+}
+```
+
+### Supported Sources
+- Direct URLs ending in `.jpg`, `.png`, `.gif`, `.webp`, `.svg`, `.bmp`
+- Google Drive shared links
+- Cloudinary CDN
+- Imgur
+
+### Formula Support
+Extracts URLs from `=IMAGE("url")` formulas:
+```
+=IMAGE("https://example.com/image.jpg", 4, 50, 50)
+```
+→ Renders as: `https://example.com/image.jpg`
+
+### Frontend Behavior
+- Thumbnails: 50x50px in table cells
+- Hover zoom: 320x380px popup follows cursor
+- Lazy loading for performance
 
 ---
 
 ## Token Management (Pathao)
 
-Pathao uses OAuth2 with access + refresh tokens. The `PathaoCourier` class manages this automatically:
+Pathao uses OAuth2 with access + refresh tokens. [`PathaoCourier`](pathao_courier.py) manages this automatically:
 
 ```
 First run:
-  No token.json found -> Full login -> Saves tokens
+  No token.json → Full login → Save tokens
 
 Subsequent runs:
-  token.json exists -> Token valid? -> Use cached (0 API calls)
-                    -> Token expired? -> Try refresh_token (1 API call)
-                    -> Refresh fails? -> Full login (1 API call)
+  token.json exists → Token valid? → Use cached (0 API calls)
+                   → Token expired? → Refresh token (1 API call)
+                   → Refresh fails? → Full login (1 API call)
 
 During API call:
-  401 Unauthorized? -> Auto-refresh token -> Retry once
+  401 Unauthorized? → Auto-refresh → Retry once
 ```
 
-Tokens are stored in `token.json` alongside the script. The access token is typically valid for **~90 days**.
+**Token file:** [`token.json`](token.json) (auto-generated, expires ~90 days)
 
-**Steadfast** does not require token management - it uses static API Key + Secret Key in request headers.
+**Steadfast** uses static API Key + Secret Key (no token management needed).
 
 ---
 
 ## Error Handling
 
-All files include comprehensive error handling for production reliability:
-
-### pathao_courier.py
-
-| Error Scenario | Handling |
-|---|---|
-| Missing `.env` variables | `EnvironmentError` raised at init with list of missing vars |
-| `token.json` corrupted | Warns and falls back to fresh login |
-| `token.json` write permission denied | Warns, continues with in-memory token |
-| Network down / DNS failure | `requests.ConnectionError` caught, returns `None` |
-| Request timeout | `requests.Timeout` caught (10s connect, 30s read limits) |
-| API returns non-JSON | `ValueError` caught, returns `None` |
-| 401 during API call | Auto-retries once with refreshed token |
-| Empty consignment ID | Warns and returns `None` |
-
-### steadfast_courier.py
-
-| Error Scenario | Handling |
-|---|---|
-| Missing `.env` variables | `EnvironmentError` raised at init |
-| Network / timeout errors | All `requests` exceptions caught |
-| 401 (bad API key) | Clear message to check `.env` credentials |
-| 404 (order not found) | Specific error message |
-| 429 (rate limit) | Rate-limit message with retry suggestion |
-| Non-JSON response | `ValueError` caught |
-
-### update_order_status.py
-
-| Error Scenario | Handling |
-|---|---|
-| `credentials.json` missing | `FileNotFoundError` with clear message |
-| `credentials.json` invalid | `ValueError` with details |
-| Spreadsheet not found | Message with sharing instructions |
-| Sales worksheet missing | `WorksheetNotFound` caught |
-| Duplicate/empty column headers | `GSpreadException` caught with explanation |
-| Required columns missing | Validates upfront before processing |
-| Courier client init fails | Sets sentinel, skips all orders for that courier |
-| Individual order fetch fails | Logs error, continues to next row |
-| Google API rate limit on update | Caught with retry suggestion |
-| `Ctrl+C` interrupt | Clean exit |
-| Any unexpected error | Top-level catch with error type and message |
-
----
-
-## Google Sheet Structure
-
-The Sales sheet must have these **required columns** (order doesn't matter):
-
-| Column | Description | Example |
+### Backend ([`main.py`](main.py))
+| Error | HTTP Status | Response |
 |---|---|---|
-| `Order ID` | Unique order identifier | `ORD#20260201-01478` |
-| `Consignment ID` | Courier tracking ID (empty if not dispatched) | `DA010226MAN7CG` |
-| `Delivery Platform` | Courier service name | `Pathao Inside` |
-| `Order Status` | Current delivery status (updated by this tool) | `Delivered` |
+| Invalid credentials | 401 | `{"detail": "Invalid email or password"}` |
+| Token expired/invalid | 401 | `{"detail": "Token expired or invalid. Please log in again."}` |
+| No permission for sheet | 403 | `{"detail": "You don't have access to 'SheetName'"}` |
+| Sheet not found | 404 | `{"detail": "Worksheet 'SheetName' not found."}` |
+| Google Sheets API error | 502 | `{"detail": "Failed to access sheet: ..."}` |
 
-Other columns present in the sheet (`Date`, `Customer Name`, `Product ID`, `Quantity`, `Total Price`, `Discount`, `Discounted Price`, `Delivery Cost`, `Payable Amount`, `Advance Payment`, `Due Payment`, `Sales By`, `Return Reason`, `Dispatch Date`) are read but not modified.
+### Frontend ([`app.js`](static/js/app.js))
+- **401 responses** → Auto-logout and redirect to login
+- **Network errors** → Toast notification with error message
+- **Form validation** → Inline warnings before submission
+- **Token verification** → Background check on page load, logout if invalid
+
+### Courier APIs
+See [pathao_courier.py](pathao_courier.py) and [steadfast_courier.py](steadfast_courier.py) for retry logic, timeout handling, and rate-limit detection.
 
 ---
 
 ## Security Notes
 
-The following files contain sensitive credentials and **must not be committed to version control**:
+### Files to Keep Private
+
+**NEVER commit these files to version control:**
 
 | File | Contains |
 |---|---|
-| `credentials.json` | Google service account private key |
-| `.env` | Pathao & Steadfast API credentials |
-| `token.json` | Pathao access & refresh tokens |
+| [`credentials.json`](credentials.json) | Google service account private key |
+| [`.env`](.env) | Pathao & Steadfast API credentials + JWT secret |
+| [`token.json`](token.json) | Pathao access & refresh tokens |
 
-Add these to your `.gitignore`:
-
+Add to `.gitignore`:
 ```gitignore
 credentials.json
 .env
 token.json
+__pycache__/
+*.pyc
 ```
+
+### Best Practices
+- Use strong JWT secret (32+ random characters)
+- Store passwords hashed (current implementation uses plain text for demo)
+- Use HTTPS in production
+- Set short JWT expiration times (e.g., 1 hour)
+- Implement refresh token rotation
+- Add rate limiting to login endpoint
+- Use environment-specific `.env` files (`.env.dev`, `.env.prod`)
 
 ---
 
@@ -501,12 +712,36 @@ token.json
 
 | Problem | Solution |
 |---|---|
-| `SpreadsheetNotFound` | Share the spreadsheet with the service account email in `credentials.json` (`client_email` field) |
-| `Spreadsheet has duplicate headers` | Check the Sales sheet for empty or duplicate column names in row 1 |
-| `Missing required env variable(s)` | Ensure all variables are set in the `.env` file (no quotes needed for values) |
-| `Pathao login failed (401)` | Verify `PATHAO_EMAIL` and `PATHAO_PASSWORD` in `.env` are correct |
-| `Steadfast auth failed (401)` | Verify `STEADFAST_API_KEY` and `STEADFAST_SECRET_KEY` in `.env` |
-| `Steadfast: Id must be numeric` | Steadfast consignment IDs are numeric only (e.g., `123456`) |
-| `Network error / Timeout` | Check your internet connection; the APIs may also be temporarily down |
-| `Google API rate limit` | Wait 1-2 minutes and try again; Google Sheets API has a quota of 60 requests/minute |
-| `token.json is malformed` | Delete `token.json` and run again - a fresh token will be generated |
+| `SpreadsheetNotFound` | Share the spreadsheet with service account email from [`credentials.json`](credentials.json) (`client_email` field) |
+| `Worksheet 'SheetName' not found` | Check exact sheet name spelling in [`sheets_config.json`](sheets_config.json) |
+| `401 Unauthorized` after login | Verify JWT_SECRET_KEY matches between server restarts |
+| `Missing required env variable(s)` | Check [`.env`](.env) file has all required keys (no quotes needed) |
+| `Pathao login failed (401)` | Verify PATHAO_EMAIL and PATHAO_PASSWORD in [`.env`](.env) |
+| `Steadfast auth failed (401)` | Verify STEADFAST_API_KEY and STEADFAST_SECRET_KEY in [`.env`](.env) |
+| `Google API rate limit` | Wait 1-2 minutes; quota is 60 requests/minute |
+| `token.json is malformed` | Delete [`token.json`](token.json) and restart server |
+| Images not showing | Check `image_columns` in [`sheets_config.json`](sheets_config.json), verify URLs are publicly accessible |
+| DataTable not rendering | Check browser console for JavaScript errors, ensure jQuery is loaded |
+| Insert Order button hidden | Only visible on Sales Raw sheet for admin users |
+| Update Statuses button hidden | Only visible to admin users |
+
+---
+
+## License
+
+This project is for internal use. Modify and distribute as needed within your organization.
+
+---
+
+## Support
+
+For issues or questions:
+1. Check the [Troubleshooting](#troubleshooting) section
+2. Review API documentation links in [Tech Stack](#tech-stack)
+3. Check browser console (F12) for frontend errors
+4. Check server logs for backend errors
+
+---
+
+**Last Updated:** January 2026  
+**Version:** 2.0 (Web Dashboard Release)

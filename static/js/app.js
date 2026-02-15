@@ -4,6 +4,8 @@ let currentSheet = null;
 let dataTableInstance = null;
 let authUser = null;  // { username, email, role }
 let authToken = null;
+let productsList = []; // Cached product display names for dropdown
+let productRowCounter = 0;
 
 const API = "";  // same origin
 
@@ -383,6 +385,16 @@ function renderTable(headers, rows, sheetName, cfg = {}, imageCols = []) {
     }
     sheetInfo.textContent = infoText;
 
+    // Show/hide Insert Order button based on current sheet
+    const btnInsert = document.getElementById("btnInsertOrder");
+    if (btnInsert) {
+        if (sheetName === "Sales Raw" && authUser && authUser.role === "admin") {
+            btnInsert.classList.remove("d-none");
+        } else {
+            btnInsert.classList.add("d-none");
+        }
+    }
+
     hideLoading();
 }
 
@@ -456,6 +468,212 @@ async function updateStatuses() {
     } catch (err) {
         hideLoading();
         showToast(`Update failed: ${err.message}`, "danger");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
+}
+
+// ── Insert Order (Sales Raw) ────────────────────────────────────────────────
+
+async function loadProducts() {
+    if (productsList.length > 0) return; // Already cached
+    try {
+        const res = await fetch(`${API}/api/products`, { headers: getAuthHeaders() });
+        if (res.ok) {
+            const data = await res.json();
+            productsList = data.products || [];
+        }
+    } catch (err) {
+        console.error("Failed to load products:", err);
+    }
+}
+
+function buildProductOptions() {
+    let html = '<option value="">-- Select Product --</option>';
+    productsList.forEach((p) => {
+        const escaped = p.replace(/"/g, "&quot;").replace(/</g, "&lt;");
+        html += `<option value="${escaped}">${escaped}</option>`;
+    });
+    return html;
+}
+
+function addProductRow() {
+    productRowCounter++;
+    const container = document.getElementById("productList");
+    const idx = productRowCounter;
+
+    const div = document.createElement("div");
+    div.className = "product-row";
+    div.id = `productRow_${idx}`;
+    div.innerHTML = `
+        <span class="product-badge">${container.children.length + 1}</span>
+        <div class="product-select-wrapper">
+            <label class="form-label mb-1" style="font-size:0.8rem;">Product</label>
+            <select class="form-select form-select-sm product-select" required>
+                ${buildProductOptions()}
+            </select>
+        </div>
+        <div class="qty-wrapper">
+            <label class="form-label mb-1" style="font-size:0.8rem;">Qty</label>
+            <input type="number" class="form-control form-control-sm product-qty" min="1" value="1" required>
+        </div>
+        <div class="remove-btn-wrapper">
+            <label class="form-label mb-1" style="font-size:0.8rem;">&nbsp;</label>
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeProductRow('productRow_${idx}')" title="Remove">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    `;
+    container.appendChild(div);
+    renumberProductBadges();
+    
+    // Initialize Select2 on the newly added select element
+    $(`#productRow_${idx} .product-select`).select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: '-- Search Product --',
+        allowClear: true,
+        dropdownParent: $('#insertOrderModal') // Important: attach to modal
+    });
+}
+
+function removeProductRow(rowId) {
+    const container = document.getElementById("productList");
+    const row = document.getElementById(rowId);
+    if (row && container.children.length > 1) {
+        // Destroy Select2 before removing the element
+        $(row).find('.product-select').select2('destroy');
+        row.remove();
+        renumberProductBadges();
+    } else if (container.children.length <= 1) {
+        showToast("At least one product is required.", "warning");
+    }
+}
+
+function renumberProductBadges() {
+    const rows = document.querySelectorAll("#productList .product-row");
+    rows.forEach((row, i) => {
+        const badge = row.querySelector(".product-badge");
+        if (badge) badge.textContent = i + 1;
+    });
+}
+
+async function openInsertOrderModal() {
+    // Load products for dropdown
+    await loadProducts();
+    if (productsList.length === 0) {
+        showToast("Could not load product list. Try again.", "danger");
+        return;
+    }
+
+    // Reset form
+    document.getElementById("insertOrderForm").reset();
+    document.getElementById("productList").innerHTML = "";
+    productRowCounter = 0;
+
+    // Set today's date as default
+    const today = new Date().toISOString().split("T")[0];
+    document.getElementById("orderDate").value = today;
+
+    // Add first product row
+    addProductRow();
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById("insertOrderModal"));
+    modal.show();
+}
+
+async function submitInsertOrder() {
+    const btn = document.getElementById("btnSubmitOrder");
+
+    // Gather customer info
+    const date = document.getElementById("orderDate").value;
+    const customerName = document.getElementById("customerName").value.trim();
+    const customerContact = document.getElementById("customerContact").value.trim();
+    const customerAddress = document.getElementById("customerAddress").value.trim();
+    const customerType = document.getElementById("customerType").value;
+
+    // Validate customer fields
+    if (!date || !customerName || !customerContact || !customerAddress) {
+        showToast("Please fill in all required customer fields.", "warning");
+        return;
+    }
+
+    // Gather products
+    const productRows = document.querySelectorAll("#productList .product-row");
+    const products = [];
+    let valid = true;
+
+    productRows.forEach((row, i) => {
+        const select = row.querySelector(".product-select");
+        const qtyInput = row.querySelector(".product-qty");
+        const product = select.value;
+        const qty = parseInt(qtyInput.value);
+
+        if (!product) {
+            showToast(`Product #${i + 1}: Please select a product.`, "warning");
+            valid = false;
+            return;
+        }
+        if (!qty || qty < 1) {
+            showToast(`Product #${i + 1}: Quantity must be at least 1.`, "warning");
+            valid = false;
+            return;
+        }
+        products.push({ product_details: product, quantity: qty });
+    });
+
+    if (!valid || products.length === 0) return;
+
+    // Format date to match sheet format (d-MMM-yyyy)
+    const dateObj = new Date(date + "T00:00:00");
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const formattedDate = `${dateObj.getDate()}-${months[dateObj.getMonth()]}-${dateObj.getFullYear()}`;
+
+    // Submit
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Submitting...';
+
+    try {
+        const res = await fetch(`${API}/api/sales-raw/insert`, {
+            method: "POST",
+            headers: {
+                ...getAuthHeaders(),
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                date: formattedDate,
+                customer_name: customerName,
+                customer_contact: customerContact,
+                customer_address: customerAddress,
+                customer_type: customerType,
+                products: products,
+            }),
+        });
+
+        if (res.status === 401) { logout(); return; }
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        // Close modal
+        const modalEl = document.getElementById("insertOrderModal");
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+
+        showToast(data.message || `Order inserted successfully!`, "success");
+
+        // Refresh Sales Raw sheet if currently viewing
+        if (currentSheet === "Sales Raw") {
+            loadSheetData("Sales Raw");
+        }
+    } catch (err) {
+        showToast(`Insert failed: ${err.message}`, "danger");
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalHTML;
