@@ -2,6 +2,8 @@
 
 A full-stack web application for managing orders, inventory, and delivery statuses. Built with FastAPI backend and vanilla JavaScript frontend, integrated with Google Sheets for data storage and Pathao/Steadfast courier APIs for real-time delivery tracking.
 
+> **🎉 New in v2.1 (February 2026)**: Refactored to **multi-page architecture** with modular JavaScript! Each sheet now has its own dedicated HTML page and JS file, making the codebase easier to maintain and extend. See [Architecture Highlights](#architecture-highlights) for details.
+
 ---
 
 ## Table of Contents
@@ -168,6 +170,66 @@ Google sheet using python/
 ├── credentials.json           # Google service account (DO NOT COMMIT)
 ├── .env                       # API credentials (DO NOT COMMIT)
 ├── token.json                 # Pathao cached tokens (auto-generated, DO NOT COMMIT)
+├── sheets_config.json         # Sheet configuration (header rows, columns, roles)
+│
+├── static/
+│   ├── index.html            # Dashboard landing page with sheet cards
+│   ├── login.html            # Login page
+│   │
+│   ├── css/                  # Stylesheets
+│   │   ├── sheet-common.css        # Common styles for all sheet pages
+│   │   ├── dashboard.css           # Dashboard landing page styles
+│   │   ├── inventory-images.css    # Image thumbnail & zoom styles
+│   │   └── sales-raw-modal.css     # Insert Order modal styles
+│   │
+│   ├── js/                   # JavaScript modules
+│   │   ├── auth.js                 # Authentication & authorization
+│   │   ├── ui.js                   # UI components & helpers
+│   │   ├── api.js                  # API client functions
+│   │   ├── common.js               # Shared constants & utilities
+│   │   ├── app.js                  # [LEGACY] Original monolithic file (backup)
+│   │   │
+│   │   └── sheets/           # Sheet-specific JavaScript
+│   │       ├── sales.js               # Sales sheet (Update Statuses feature)
+│   │       ├── sales-raw.js           # Sales Raw (Insert Order feature)
+│   │       ├── inventory.js           # Inventory (Image display & zoom)
+│   │       ├── summary-inventory.js   # Summary Inventory (generic)
+│   │       ├── input-inventory.js     # Input Inventory (generic)
+│   │       ├── expenses.js            # Expenses (generic)
+│   │       ├── product-purchase.js    # Product Purchase (generic)
+│   │       └── information.js         # Information (generic)
+│   │
+│   └── sheets/               # Sheet-specific HTML pages
+│       ├── sales.html                # Sales sheet page
+│       ├── sales-raw.html            # Sales Raw sheet page
+│       ├── inventory.html            # Inventory sheet page
+│       ├── summary-inventory.html    # Summary Inventory page
+│       ├── input-inventory.html      # Input Inventory page
+│       ├── expenses.html             # Expenses page
+│       ├── product-purchase.html     # Product Purchase page
+│       └── information.html          # Information page
+│
+├── test.ipynb                # Jupyter notebook for testing
+├── connect_sheet.py          # Google Sheets connection test
+├── README.md                 # This file
+└── .gitignore                # Excludes credentials, .env, token.json
+```
+
+### Architecture Highlights
+
+**Multi-Page Structure**: Each sheet now has its own dedicated HTML page and JavaScript file, making the codebase easier to maintain and extend. The old single-page application (SPA) has been refactored into:
+
+1. **Dashboard Landing Page** (`index.html`): Welcome screen with clickable sheet cards filtered by user role
+2. **Sheet Pages** (`sheets/*.html`): Dedicated pages for each sheet (Sales, Inventory, etc.)
+3. **Core Modules** (`js/*.js`): Reusable utilities for authentication, UI, API calls, and common functions
+4. **Sheet-Specific Scripts** (`js/sheets/*.js`): Feature-specific logic for each sheet
+
+**Benefits**:
+- ✅ Easier code management - each sheet is isolated
+- ✅ Better performance - only load JS/CSS needed for each page
+- ✅ Simpler debugging - clear separation of concerns
+- ✅ Scalable - add new sheets without affecting existing ones
+- ✅ Maintainable - sheet-specific features don't pollute global scope
 ├── sheets_config.json         # Sheet configuration (header rows, columns, roles)
 │
 ├── static/
@@ -361,15 +423,20 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 **Access the application:**
 - Dashboard: http://127.0.0.1:8000
 - Login: http://127.0.0.1:8000/login
+- Sheet Pages: http://127.0.0.1:8000/sheets/{sheet-name}.html
 - API Docs: http://127.0.0.1:8000/docs
 
 **Default workflow:**
 1. Navigate to http://127.0.0.1:8000 → Redirects to login if not authenticated
 2. Enter credentials from UserName sheet
-3. Dashboard loads with accessible sheets in sidebar
-4. Click sheet name to view data
-5. (Admin only) Click "Update Order Statuses" to fetch delivery statuses
-6. (Admin only, Sales Raw) Click "Insert Order" to add new orders
+3. **Dashboard landing page** loads with clickable sheet cards filtered by role
+4. Click a sheet card or sidebar link → Navigates to that sheet's dedicated page
+5. View and interact with sheet data (search, sort, paginate with DataTables)
+6. Use sheet-specific features:
+   - **Sales**: Click "Update Order Statuses" (admin only) to fetch delivery statuses
+   - **Sales Raw**: Click "Insert Order" (admin only) to add new orders with products
+   - **Inventory**: Hover over images for zoom preview
+7. Use sidebar to quickly switch between sheets without returning to dashboard
 
 ### Testing Components
 
@@ -743,5 +810,5 @@ For issues or questions:
 
 ---
 
-**Last Updated:** January 2026  
-**Version:** 2.0 (Web Dashboard Release)
+**Last Updated:** February 2026  
+**Version:** 2.1 (Multi-Page Architecture Refactor)

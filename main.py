@@ -122,7 +122,7 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/")
 async def index():
-    """Serve the main frontend page (login or dashboard based on JS auth check)."""
+    """Serve the dashboard landing page."""
     return FileResponse(os.path.join(static_dir, "index.html"))
 
 
@@ -130,6 +130,15 @@ async def index():
 async def login_page():
     """Serve the login page."""
     return FileResponse(os.path.join(static_dir, "login.html"))
+
+
+@app.get("/sheets/{sheet_file}.html")
+async def serve_sheet_page(sheet_file: str):
+    """Serve sheet-specific HTML pages from the sheets/ directory."""
+    file_path = os.path.join(static_dir, "sheets", f"{sheet_file}.html")
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    raise HTTPException(status_code=404, detail="Sheet page not found")
 
 
 # ── Auth Endpoints ───────────────────────────────────────────────────────────
