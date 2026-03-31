@@ -1,74 +1,136 @@
 /* ── Dashboard Landing Page Styles ──────────────────────────────────────── */
 
-/* Dashboard welcome section */
+/* ── Welcome Banner ──────────────────────────────────────────────────────── */
 .dashboard-welcome {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
     color: #fff;
-    padding: 40px 24px;
-    border-radius: 0;
+    padding: 40px 28px;
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-welcome::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 220px;
+    height: 220px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.dashboard-welcome::after {
+    content: '';
+    position: absolute;
+    bottom: -60px;
+    right: 80px;
+    width: 160px;
+    height: 160px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 50%;
+    pointer-events: none;
 }
 
 .dashboard-welcome h1 {
-    font-size: 2rem;
-    font-weight: 600;
-    margin-bottom: 8px;
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    position: relative;
 }
 
 .dashboard-welcome p {
-    font-size: 1rem;
-    opacity: 0.9;
+    font-size: 0.95rem;
+    opacity: 0.85;
     margin: 0;
+    position: relative;
 }
 
-/* Sheet cards grid */
+/* ── Section Label ───────────────────────────────────────────────────────── */
+.sheets-section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    padding: 20px 28px 8px;
+}
+
+/* ── Sheet Cards Grid ────────────────────────────────────────────────────── */
 .sheets-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
-    padding: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    padding: 8px 28px 28px;
 }
 
-/* Individual sheet card */
+/* ── Individual Sheet Card ───────────────────────────────────────────────── */
 .sheet-card {
     background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 12px;
-    padding: 24px;
-    transition: all 0.2s ease;
-    cursor: pointer;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 22px 20px;
     text-decoration: none;
     color: inherit;
     display: block;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    position: relative;
+    overflow: hidden;
 }
 
-.sheet-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-    border-color: #0d6efd;
+.sheet-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, transparent);
+    transition: background 0.2s ease;
 }
 
+@media (hover: hover) {
+    .sheet-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(0,0,0,0.10);
+        border-color: #6366f1;
+    }
+
+    .sheet-card:hover::before {
+        background: linear-gradient(90deg, #6366f1, #a855f7);
+    }
+}
+
+.sheet-card:active {
+    transform: scale(0.98);
+}
+
+/* Sheet card icon */
 .sheet-card-icon {
-    width: 48px;
-    height: 48px;
+    width: 46px;
+    height: 46px;
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
-    margin-bottom: 16px;
+    font-size: 1.4rem;
+    margin-bottom: 14px;
+    flex-shrink: 0;
 }
 
 .sheet-card-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: #212529;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: #0f172a;
 }
 
 .sheet-card-description {
-    font-size: 0.9rem;
-    color: #6c757d;
-    margin-bottom: 16px;
+    font-size: 0.82rem;
+    color: #64748b;
+    margin-bottom: 14px;
     line-height: 1.5;
 }
 
@@ -76,51 +138,116 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 0.85rem;
-    color: #6c757d;
+    font-size: 0.8rem;
+    color: #6366f1;
+    font-weight: 500;
+}
+
+.sheet-card-footer i {
+    transition: transform 0.2s ease;
+}
+
+@media (hover: hover) {
+    .sheet-card:hover .sheet-card-footer i {
+        transform: translateX(3px);
+    }
 }
 
 .sheet-card-badge {
-    font-size: 0.75rem;
-    padding: 4px 8px;
-    border-radius: 4px;
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-weight: 500;
 }
 
-/* Color variants for different sheets */
+/* ── Icon colour variants ────────────────────────────────────────────────── */
 .sheet-card-icon.sales {
-    background: #d1ecf1;
-    color: #0c5460;
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    color: #1d4ed8;
 }
 
 .sheet-card-icon.inventory {
-    background: #d4edda;
-    color: #155724;
+    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+    color: #15803d;
 }
 
 .sheet-card-icon.expenses {
-    background: #f8d7da;
-    color: #721c24;
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    color: #b91c1c;
 }
 
 .sheet-card-icon.information {
-    background: #fff3cd;
-    color: #856404;
+    background: linear-gradient(135deg, #fef9c3, #fef08a);
+    color: #a16207;
 }
 
 .sheet-card-icon.default {
-    background: #e7f1ff;
-    color: #004085;
+    background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+    color: #6d28d9;
 }
 
-/* Empty state for no sheets */
+/* ── No Sheets Message ───────────────────────────────────────────────────── */
 .no-sheets-message {
     text-align: center;
     padding: 60px 20px;
-    color: #6c757d;
+    color: #64748b;
 }
 
 .no-sheets-message i {
     font-size: 3rem;
-    margin-bottom: 16px;
-    opacity: 0.5;
+    margin-bottom: 14px;
+    opacity: 0.4;
+    display: block;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 767.98px) {
+    .dashboard-welcome {
+        padding: 28px 20px;
+    }
+
+    .dashboard-welcome h1 {
+        font-size: 1.35rem;
+    }
+
+    .sheets-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        padding: 8px 16px 20px;
+    }
+
+    .sheets-section-label {
+        padding: 16px 16px 6px;
+    }
+
+    .sheet-card {
+        padding: 16px 14px;
+    }
+
+    .sheet-card-icon {
+        width: 38px;
+        height: 38px;
+        font-size: 1.1rem;
+        margin-bottom: 10px;
+    }
+
+    .sheet-card-title {
+        font-size: 0.875rem;
+    }
+
+    .sheet-card-description {
+        display: none;
+    }
+
+    .sheet-card-footer {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 359px) {
+    .sheets-grid {
+        grid-template-columns: 1fr;
+    }
 }

@@ -253,27 +253,30 @@
         div.className = "product-row";
         div.id = `productRow_${idx}`;
         div.innerHTML = `
-            <span class="product-badge">${container.children.length + 1}</span>
-            <div class="product-select-wrapper">
-                <label class="form-label mb-1" style="font-size:0.8rem;">Product</label>
-                <select class="form-select form-select-sm product-select" required>
-                    ${buildProductOptions()}
-                </select>
+            <div class="product-row-top">
+                <span class="product-badge">${container.children.length + 1}</span>
+                <div class="product-select-wrapper">
+                    <label class="form-label mb-1">Product</label>
+                    <select class="form-select form-select-sm product-select" required>
+                        ${buildProductOptions()}
+                    </select>
+                </div>
             </div>
-            <div class="qty-wrapper">
-                <label class="form-label mb-1" style="font-size:0.8rem;">Qty</label>
-                <input type="number" class="form-control form-control-sm product-qty" min="1" value="1" required>
-            </div>
-            <div class="price-wrapper">
-                <label class="form-label mb-1" style="font-size:0.8rem;">Price</label>
-                <input type="text" class="form-control form-control-sm product-price" value="" readonly>
-            </div>
-
-            <div class="remove-btn-wrapper">
-                <label class="form-label mb-1" style="font-size:0.8rem;">&nbsp;</label>
-                <button type="button" class="btn btn-outline-danger btn-sm remove-product-btn" data-row-id="productRow_${idx}" title="Remove">
-                    <i class="bi bi-trash"></i>
-                </button>
+            <div class="product-row-bottom">
+                <div class="qty-wrapper">
+                    <label class="form-label mb-1">Qty</label>
+                    <input type="number" class="form-control form-control-sm product-qty" min="1" value="1" required>
+                </div>
+                <div class="price-wrapper">
+                    <label class="form-label mb-1">Price</label>
+                    <input type="text" class="form-control form-control-sm product-price" value="" readonly>
+                </div>
+                <div class="remove-btn-wrapper">
+                    <label class="form-label mb-1">&nbsp;</label>
+                    <button type="button" class="btn btn-outline-danger btn-sm remove-product-btn" data-row-id="productRow_${idx}" title="Remove">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
             </div>
         `;
         container.appendChild(div);
@@ -531,6 +534,7 @@
     function init() {
         if (!auth.checkAuth()) return;
 
+        ui.init();
         ui.setupUserProfile();
         setupNavigation();
         loadData();

@@ -107,6 +107,7 @@
     function init() {
         if (!auth.checkAuth()) return;
 
+        ui.init();
         ui.setupUserProfile();
         setupNavigation();
         loadData();

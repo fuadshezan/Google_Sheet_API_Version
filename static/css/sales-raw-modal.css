@@ -1,57 +1,209 @@
-/* ── Insert Order Modal Styles (Sales Raw Sheet) ──────────────────────────── */
+/* ── Insert Order Modal Styles (Sales Raw Sheet) ───────────────────────── */
 
-/* Product row in modal */
+/* ── Modal-wide mobile font scaling ──────────────────────────────────────── */
+/* Mobile-first: smaller fonts on small screens for the modal body */
+@media (max-width: 767.98px) {
+    #insertOrderModal .modal-body {
+        font-size: 0.8rem;
+    }
+
+    #insertOrderModal .modal-body .form-label {
+        font-size: 0.72rem;
+        margin-bottom: 3px;
+    }
+
+    #insertOrderModal .modal-body .form-control,
+    #insertOrderModal .modal-body .form-select {
+        font-size: 0.8rem;
+        padding: 6px 10px;
+    }
+
+    #insertOrderModal .modal-body .card-header {
+        font-size: 0.78rem;
+        padding: 8px 12px;
+    }
+
+    #insertOrderModal .modal-body .card-body {
+        padding: 12px;
+    }
+
+    #insertOrderModal .modal-body .row.g-3 {
+        --bs-gutter-y: 0.6rem;
+        --bs-gutter-x: 0.5rem;
+    }
+
+    #insertOrderModal .modal-header {
+        padding: 10px 14px;
+    }
+
+    #insertOrderModal .modal-header .modal-title {
+        font-size: 0.95rem;
+    }
+
+    #insertOrderModal .modal-footer {
+        padding: 10px 14px;
+    }
+
+    #insertOrderModal .modal-footer .btn {
+        font-size: 0.8rem;
+        padding: 6px 14px;
+    }
+}
+
+/* ── Product row container ───────────────────────────────────────────────── */
 .product-row {
     padding: 12px 16px;
-    border-bottom: 1px solid #e9ecef;
-    display: flex;
-    align-items: flex-end;
-    gap: 12px;
+    border-bottom: 1px solid #f1f5f9;
 }
 
 .product-row:last-child {
     border-bottom: none;
 }
 
-.product-row .product-select-wrapper {
+/* ── Row Top: badge + product select (always full width) ─────────────────── */
+.product-row-top {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.product-row-top .product-select-wrapper {
     flex: 1;
+    min-width: 0;
 }
 
-.product-row .price-wrapper {
-    width: 110px;
+/* ── Row Bottom: qty + price + remove btn (side by side) ─────────────────── */
+.product-row-bottom {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
 }
 
-.product-row .qty-wrapper {
-    width: 90px;
+.product-row-bottom .qty-wrapper {
+    flex: 1 1 0;
+    min-width: 0;
 }
 
-.product-row .remove-btn-wrapper {
-    width: 38px;
-    flex-shrink: 0;
+.product-row-bottom .price-wrapper {
+    flex: 1 1 0;
+    min-width: 0;
 }
 
-/* Product badge (number indicator) */
+.product-row-bottom .remove-btn-wrapper {
+    flex: 0 0 36px;
+}
+
+/* ── Product number badge ────────────────────────────────────────────────── */
 .product-badge {
-    background: #198754;
+    background: linear-gradient(135deg, #6366f1, #a855f7);
     color: #fff;
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin-right: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
     flex-shrink: 0;
+    margin-bottom: 2px;
 }
 
-/* Select2 customization for product dropdown */
+/* ── Labels inside product rows ──────────────────────────────────────────── */
+.product-row .form-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #475569;
+    margin-bottom: 4px;
+    display: block;
+}
+
+/* ── Select2 customisation ───────────────────────────────────────────────── */
 .select2-container--bootstrap-5 .select2-selection {
-    min-height: 31px !important;
-    font-size: 0.875rem;
+    min-height: 36px !important;
+    font-size: 0.85rem;
+    border-color: #e2e8f0;
+    border-radius: 8px !important;
 }
 
 .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
-    line-height: 29px !important;
+    line-height: 34px !important;
+    padding-left: 10px;
+}
+
+.select2-container--bootstrap-5.select2-container--focus .select2-selection,
+.select2-container--bootstrap-5.select2-container--open .select2-selection {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+
+/* ── Form controls inside modal ──────────────────────────────────────────── */
+.modal .form-control,
+.modal .form-select {
+    border-radius: 8px;
+    border-color: #e2e8f0;
+    font-size: 0.85rem;
+}
+
+.modal .form-control:focus,
+.modal .form-select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+
+.modal .card {
+    border-color: #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.modal .card-header {
+    background: #f8fafc;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-bottom-color: #e2e8f0;
+    color: #0f172a;
+}
+
+/* ── Mobile adjustments for product rows ─────────────────────────────────── */
+@media (max-width: 575.98px) {
+    .product-row {
+        padding: 10px 12px;
+    }
+
+    .product-row-top {
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .product-row-bottom {
+        gap: 8px;
+    }
+
+    .product-badge {
+        width: 22px;
+        height: 22px;
+        font-size: 0.65rem;
+    }
+
+    .product-row .form-label {
+        font-size: 0.7rem;
+    }
+
+    .product-row-bottom .form-control {
+        font-size: 0.8rem;
+        padding: 5px 8px;
+    }
+
+    /* Select2 smaller on mobile */
+    .select2-container--bootstrap-5 .select2-selection {
+        min-height: 32px !important;
+        font-size: 0.8rem;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        line-height: 30px !important;
+    }
 }
