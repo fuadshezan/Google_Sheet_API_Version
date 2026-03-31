@@ -17,6 +17,10 @@
     flex: 1;
 }
 
+.product-row .price-wrapper {
+    width: 110px;
+}
+
 .product-row .qty-wrapper {
     width: 90px;
 }

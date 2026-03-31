@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,12 +14,14 @@
     <link href="https://cdn.datatables.net/2.1.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <!-- Select2 -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-    
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css"
+        rel="stylesheet" />
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/sheet-common.css">
     <link rel="stylesheet" href="/static/css/sales-raw-modal.css">
 </head>
+
 <body>
 
     <!-- Loading Overlay -->
@@ -69,7 +72,8 @@
                 <button id="btnRefresh" class="btn btn-sm btn-outline-primary" disabled>
                     <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                 </button>
-                <button id="btnInsert" class="btn btn-sm btn-success" style="display: none;" data-bs-toggle="modal" data-bs-target="#insertOrderModal">
+                <button id="btnInsert" class="btn btn-sm btn-success" style="display: none;" data-bs-toggle="modal"
+                    data-bs-target="#insertOrderModal">
                     <i class="bi bi-plus-lg me-1"></i>Insert Order
                 </button>
             </div>
@@ -87,7 +91,9 @@
             <!-- Table Wrapper -->
             <div id="tableWrapper" class="d-none">
                 <table id="dataTable" class="table table-striped table-hover table-sm">
-                    <thead><tr></tr></thead>
+                    <thead>
+                        <tr></tr>
+                    </thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -95,7 +101,8 @@
     </main>
 
     <!-- Insert Order Modal -->
-    <div class="modal fade" id="insertOrderModal" tabindex="-1" aria-labelledby="insertOrderModalLabel" aria-hidden="true">
+    <div class="modal fade" id="insertOrderModal" tabindex="-1" aria-labelledby="insertOrderModalLabel"
+        aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header bg-success text-white">
@@ -113,30 +120,89 @@
                             </div>
                             <div class="card-body">
                                 <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="orderDate" class="form-label">Date <span class="text-danger">*</span></label>
+                                    <div class="col-md-4">
+                                        <label for="customerName" class="form-label">Customer Name <span
+                                                class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="customerName"
+                                            placeholder="Enter customer name" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="customerContact" class="form-label">Contact Number <span
+                                                class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="customerContact"
+                                            placeholder="01XXXXXXXXX" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="customerAddress" class="form-label">Address <span
+                                                class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="customerAddress"
+                                            placeholder="Enter delivery address" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="orderDate" class="form-label">Date <span
+                                                class="text-danger">*</span></label>
                                         <input type="date" class="form-control" id="orderDate" required>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-3">
                                         <label for="customerType" class="form-label">Customer Type</label>
                                         <select class="form-select" id="customerType">
                                             <option value="">Select type</option>
                                             <option value="Retail">Retail</option>
-                                            <option value="Regular">Regular</option>
+                                            #by default, all customers are regular. So, we can set regular as default
+                                            value
+                                            <option value="Regular" selected>Regular</option>
                                         </select>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="customerName" class="form-label">Customer Name <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="customerName" placeholder="Enter customer name" required>
+                                    <div class="col-md-3">
+                                        <label for="deliveryPlatform" class="form-label">Delivery Platform <span
+                                                class="text-danger">*</span></label>
+                                        <select class="form-select" id="deliveryPlatform" required>
+                                            <option value="">Select platform</option>
+                                            <option value="Pathao Inside">Pathao Inside</option>
+                                            <option value="Pathao Outside">Pathao Outside</option>
+                                            <option value="Steadfast Inside">Steadfast Inside</option>
+                                            <option value="Steadfast Outside">Steadfast Outside</option>
+                                            <option value="Personal Dev">Personal Dev</option>
+                                            <option value="Pathao Subcity">Pathao Subcity</option>
+                                            <option value="Steadfast Subcity">Steadfast Subcity</option>
+                                        </select>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="customerContact" class="form-label">Contact Number <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="customerContact" placeholder="01XXXXXXXXX" required>
+                                    <div class="col-md-3">
+                                        <label for="deliveryCharge" class="form-label">Delivery Charge</label>
+                                        <input type="number" class="form-control" id="deliveryCharge" placeholder="Auto" value="" readonly>
                                     </div>
-                                    <div class="col-12">
-                                        <label for="customerAddress" class="form-label">Address <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="customerAddress" placeholder="Enter delivery address" required>
+                                    <div class="col-md-3">
+                                        <label for="salesBy" class="form-label">Sales By <span
+                                                class="text-danger">*</span></label>
+                                        <select class="form-select" id="salesBy" required>
+                                            <option value="">Select salesperson</option>
+                                            <option value="Orki">Orki</option>
+                                            <option value="Munni">Munni</option>
+                                            <option value="Mukta">Mukta</option>
+                                            <option value="Durba">Durba</option>
+                                            <option value="Manajir">Manajir</option>
+                                            <option value="Fuad">Fuad</option>
+                                        </select>
                                     </div>
+                                    <div class="col-md-3">
+                                        <label for="TotalPrice" class="form-label">Total Product Price <span
+                                                class="text-danger"></span></label>
+                                        <input type="number" class="form-control" id="TotalPrice"
+                                            placeholder="Enter total price" value="0">
+                                    </div>
+                                    
+                                    <!-- Default value should be zero -->
+                                    <div class="col-md-3">
+                                        <label for="discountedPrice" class="form-label">Discounted Price <span
+                                                class="text-danger"></span></label>
+                                        <input type="number" class="form-control" id="discountedPrice"
+                                            placeholder="Enter discounted price" value="0" >
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="payableAmount" class="form-label">Payable Amount</label>
+                                        <input type="number" class="form-control" id="payableAmount" value="0" readonly>
+                                    </div>
+                                    
                                 </div>
                             </div>
                         </div>
@@ -173,14 +239,15 @@
     <script src="https://cdn.datatables.net/2.1.8/js/dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/2.1.8/js/dataTables.bootstrap5.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    
+
     <!-- Core Modules -->
     <script src="/static/js/auth.js"></script>
     <script src="/static/js/ui.js"></script>
     <script src="/static/js/api.js"></script>
     <script src="/static/js/common.js"></script>
-    
+
     <!-- Sheet-Specific Script -->
     <script src="/static/js/sheets/sales-raw.js"></script>
 </body>
+
 </html>

@@ -41,10 +41,30 @@ const api = (function() {
     /**
      * Fetch data from a specific sheet
      * @param {string} sheetName - Name of the sheet
+     * @param {string} dateFrom - Optional start date for filtering (YYYY-MM-DD)
+     * @param {string} dateTo - Optional end date for filtering (YYYY-MM-DD)
      * @returns {Promise<Object>} Sheet data with headers, rows, config, image_columns
      */
-    async function fetchSheetData(sheetName) {
-        const res = await fetch(`${API_BASE}/api/sheets/${encodeURIComponent(sheetName)}`, {
+    async function fetchSheetData(sheetName, dateFrom = null, dateTo = null) {
+        let url = `${API_BASE}/api/sheets/${encodeURIComponent(sheetName)}`;
+        
+        // Add query parameters if date range is specified
+        const params = new URLSearchParams();
+        
+        if (dateFrom !== null && dateFrom !== undefined && dateFrom !== "") {
+            params.append("date_from", dateFrom);
+        }
+        
+        if (dateTo !== null && dateTo !== undefined && dateTo !== "") {
+            params.append("date_to", dateTo);
+        }
+        
+        const queryString = params.toString();
+        if (queryString) {
+            url += `?${queryString}`;
+        }
+        
+        const res = await fetch(url, {
             headers: auth.getAuthHeaders()
         });
         await handleResponse(res);
@@ -69,6 +89,9 @@ const api = (function() {
      * @returns {Promise<Object>} Result with message, sl_no, rows_added
      */
     async function insertOrder(orderData) {
+        // # why this console log is not showing in the browser console when I click submit order button?
+        
+        // console.log("Inserting order with data:", orderData);
         const res = await fetch(`${API_BASE}/api/sales-raw/insert`, {
             method: "POST",
             headers: {
@@ -87,6 +110,20 @@ const api = (function() {
      */
     async function updateStatuses() {
         const res = await fetch(`${API_BASE}/api/update-statuses`, {
+            method: "POST",
+            headers: auth.getAuthHeaders()
+        });
+        await handleResponse(res);
+        return res.json();
+    }
+
+    /**
+     * Update single order status from courier API
+     * @param {string} orderId - Order ID to update
+     * @returns {Promise<Object>} Update result with status
+     */
+    async function updateSingleStatus(orderId) {
+        const res = await fetch(`${API_BASE}/api/update-status/${encodeURIComponent(orderId)}`, {
             method: "POST",
             headers: auth.getAuthHeaders()
         });
@@ -136,6 +173,7 @@ const api = (function() {
         fetchProducts,
         insertOrder,
         updateStatuses,
+        updateSingleStatus,
         getCurrentUser,
         login
     };

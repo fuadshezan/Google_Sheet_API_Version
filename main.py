@@ -2,6 +2,7 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from typing import Optional
+from enum import Enum
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Depends, Request
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 
 from sheets_service import SheetsService
 from auth_service import create_access_token, verify_access_token
@@ -38,6 +39,21 @@ class ProductItem(BaseModel):
     quantity: int
 
 
+class Platform(str, Enum):
+    pathao_inside ="Pathao Inside"
+    pathao_outside = "Pathao Outside"
+    steadfast_inside = "Steadfast Inside"
+    steadfast_outside = "Steadfast Outside"
+    personal_dev = "Personal Dev"
+    pathao_subcity = "Pathao Subcity"
+    steadfast_subcity = "Steadfast Subcity"
+
+class Sales(BaseModel):
+    discounted_price: float
+    total_price: float 
+    delivery_platform: Platform
+    sales_by: str
+
 class InsertOrderRequest(BaseModel):
     date: str
     customer_name: str
@@ -45,7 +61,18 @@ class InsertOrderRequest(BaseModel):
     customer_address: str
     customer_type: str = ""
     products: List[ProductItem]
+    sales: Sales
 
+#Create a dictionary for delivery charges based on the delivery platform
+delivery_charges = {
+    "Pathao Inside": 70,
+    "Pathao Outside": 110,
+    "Steadfast Inside": 70,
+    "Steadfast Outside": 110,
+    "Personal Dev": 0,
+    "Pathao Subcity": 90,
+    "Steadfast Subcity": 90,
+}
 
 # ── Auth Dependency ──────────────────────────────────────────────────────────
 
@@ -79,6 +106,64 @@ async def get_optional_user(request: Request) -> Optional[dict]:
         return None
     token = auth_header.replace("Bearer ", "")
     return verify_access_token(token)
+
+
+# ── Helper Functions ─────────────────────────────────────────────────────────
+
+def filter_by_date(headers: List[str], rows: List[List], date_from: Optional[str], date_to: Optional[str]) -> List[List]:
+    """Filter rows by date range. Expects Date column in headers."""
+    from datetime import datetime
+    
+    # Find Date column index
+    date_idx = None
+    for i, h in enumerate(headers):
+        if h.strip().lower() == "date":
+            date_idx = i
+            break
+    
+    if date_idx is None:
+        return rows  # No Date column found, return all rows
+    
+    filtered_rows = []
+    
+    for row in rows:
+        if date_idx >= len(row):
+            continue
+            
+        row_date_str = row[date_idx].strip() if row[date_idx] else ""
+        
+        if not row_date_str:
+            continue
+        
+        try:
+            # Try parsing different date formats
+            row_date = None
+            for fmt in ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%y", "%m/%d/%y"]:
+                try:
+                    row_date = datetime.strptime(row_date_str, fmt).date()
+                    break
+                except ValueError:
+                    continue
+            
+            if row_date is None:
+                continue
+            
+            # Apply filters
+            if date_from:
+                from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+                if row_date < from_date:
+                    continue
+            
+            if date_to:
+                to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+                if row_date > to_date:
+                    continue
+            
+            filtered_rows.append(row)
+        except Exception:
+            continue
+    
+    return filtered_rows
 
 
 # ── Lifespan (startup / shutdown) ────────────────────────────────────────────
@@ -217,8 +302,13 @@ async def get_config(user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/sheets/{sheet_name}")
-async def get_sheet(sheet_name: str, user: dict = Depends(get_current_user)):
-    """Return all data from a specific sheet (if user has access)."""
+async def get_sheet(
+    sheet_name: str, 
+    user: dict = Depends(get_current_user),
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None
+):
+    """Return all data from a specific sheet (if user has access), with optional date filtering."""
     role = user.get("role", "moderator")
 
     if not sheets.can_access_sheet(sheet_name, role):
@@ -231,6 +321,11 @@ async def get_sheet(sheet_name: str, user: dict = Depends(get_current_user)):
         filtered_headers, filtered_rows = sheets.filter_columns_for_role(
             sheet_name, role, data["headers"], data["rows"]
         )
+        
+        # Apply date filtering if requested and sheet is Sales
+        if sheet_name.strip().lower() == "sales" and (date_from or date_to):
+            filtered_rows = filter_by_date(filtered_headers, filtered_rows, date_from, date_to)
+        
         data["headers"] = filtered_headers
         data["rows"] = filtered_rows
 
@@ -327,6 +422,103 @@ async def update_statuses(user: dict = Depends(get_current_user)):
     return results
 
 
+@app.post("/api/update-status/{order_id}")
+async def update_single_status(order_id: str, user: dict = Depends(get_current_user)):
+    """
+    Update status for a single order by Order ID.
+    1. Find the order in Sales sheet
+    2. Get its Consignment ID
+    3. Fetch status from Pathao / Steadfast
+    4. Update the Google Sheet
+    """
+    # Import the existing functions from update_order_status.py
+    from update_order_status import _detect_platform
+    import gspread
+    
+    try:
+        sheet_data = sheets.get_sheet_data("Sales")
+        worksheet = sheets.get_worksheet("Sales")
+    except (KeyError, ConnectionError) as e:
+        raise HTTPException(status_code=502, detail=f"Could not read Sales sheet: {e}")
+    
+    # Find the order row
+    headers = sheet_data["headers"]
+    try:
+        order_id_idx = headers.index("Order ID")
+        consignment_id_idx = headers.index("Consignment ID")
+        delivery_platform_idx = headers.index("Delivery Platform")
+        status_idx = headers.index("Order Status")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Required column not found: {e}")
+    
+    # Find the row with this Order ID
+    order_row = None
+    row_number = None
+    for idx, row in enumerate(sheet_data["rows"]):
+        if row[order_id_idx] == order_id:
+            order_row = row
+            # Add 2: 1 for header row, 1 for 0-based to 1-based conversion
+            row_number = idx + sheet_data.get("config", {}).get("header_row", 1) + 1
+            break
+    
+    if order_row is None:
+        raise HTTPException(status_code=404, detail=f"Order ID '{order_id}' not found")
+    
+    consignment_id = order_row[consignment_id_idx] if consignment_id_idx < len(order_row) else ""
+    delivery_platform = order_row[delivery_platform_idx] if delivery_platform_idx < len(order_row) else ""
+    
+    if not consignment_id or consignment_id.strip() == "":
+        raise HTTPException(status_code=400, detail=f"Order '{order_id}' has no Consignment ID")
+    
+    if not delivery_platform or delivery_platform.strip() == "":
+        raise HTTPException(status_code=400, detail=f"Order '{order_id}' has no Delivery Platform specified")
+    
+    # Detect platform and fetch status
+    platform = _detect_platform(delivery_platform)
+    
+    if platform == "pathao":
+        from pathao_courier import PathaoCourier, PathaoAuthError
+        try:
+            pathao = PathaoCourier()
+            order_info = pathao.get_order_info(consignment_id)
+            if not order_info or "order_status" not in order_info:
+                raise HTTPException(status_code=502, detail=f"Pathao API returned no status for {consignment_id}")
+            new_status = order_info["order_status"]
+        except PathaoAuthError as e:
+            raise HTTPException(status_code=502, detail=f"Pathao authentication failed: {e}")
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch from Pathao: {e}")
+    elif platform == "steadfast":
+        from steadfast_courier import SteadfastCourier
+        try:
+            steadfast = SteadfastCourier()
+            order_info = steadfast.get_order_by_consignment(consignment_id)
+            if not order_info or "delivery_status" not in order_info:
+                raise HTTPException(status_code=502, detail=f"Steadfast API returned no status for {consignment_id}")
+            new_status = order_info["delivery_status"]
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch from Steadfast: {e}")
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown platform '{delivery_platform}' for Consignment ID: {consignment_id}")
+    
+    # Update the cell in Google Sheet
+    try:
+        # Column numbers are 1-based
+        status_col = status_idx + 1
+        worksheet.update_cell(row_number, status_col, new_status)
+        
+        return {
+            "success": True,
+            "order_id": order_id,
+            "consignment_id": consignment_id,
+            "status": new_status,
+            "row": row_number,
+            "platform": platform
+        }
+    except gspread.exceptions.APIError as e:
+        raise HTTPException(status_code=502, detail=f"Google Sheets update failed: {e}")
+
+
 # ── Sales Raw Insert Endpoints ───────────────────────────────────────────────
 
 @app.get("/api/products")
@@ -390,7 +582,9 @@ async def insert_sales_raw(req: InsertOrderRequest, user: dict = Depends(get_cur
 
         # Find the next empty row (after all data)
         all_values = worksheet.get_all_values()
-        next_row = len(all_values) + 1
+        # print(f"Current rows in Sales Raw: {len(all_values)}")
+        next_row = len(all_values) + 1  # +1 for header, +1 to get to the next empty row
+        # print(f"Next SL: {next_sl}, Next Row: {next_row}")
 
         # Build rows to insert
         # Columns: Order ID(A), SL No.(B), Date(C), Customer Name(D),
@@ -401,25 +595,28 @@ async def insert_sales_raw(req: InsertOrderRequest, user: dict = Depends(get_cur
         # Formula cols: A (Order ID), H (Product ID), K (Product Price),
         #               L (Total Price), M (Order Status), N (PurchasePrice)
         # We leave them empty — the sheet formulas handle them.
-        #=IF(OR(B232="",C232=""),"","ORD#"&TEXT(C232,"YYYYMMDD")&"-"&TEXT(B232,"00000"))
-        order_id_formula=f'=IF(OR(B{next_row}="",C{next_row}=""),"","ORD#"&TEXT(C{next_row},"YYYYMMDD")&"-"&TEXT(B{next_row},"00000"))'
-        #IF(AND(G232<>"", ISNUMBER(FIND("|", G232))), LEFT(G232, FIND("|", G232) - 2), "")
-        product_id_formula=f'=IF(AND(G{next_row}<>"", ISNUMBER(FIND("|", G{next_row}))), LEFT(G{next_row}, FIND("|", G{next_row}) - 2), "")'
         
-        #  =IF(H232="", "", IF(J232="Retail",XLOOKUP(H232, Inventory!A$2:A, Inventory!H$2:H, ""),    XLOOKUP(H232, Inventory!A$2:A, Inventory!I$2:I, "")))
-        product_price_formula=f'=IF(H{next_row}="", "", IF(J{next_row}="Retail",XLOOKUP(H{next_row}, Inventory!A$2:A, Inventory!H$2:H, ""),    XLOOKUP(H{next_row}, Inventory!A$2:A, Inventory!I$2:I, "")))'
-        # =IF(OR(I232="", K232=""), "", I232*K232)
-        total_price_formula=f'=IF(OR(I{next_row}="", K{next_row}=""), "", I{next_row}*K{next_row})'
-
-        # =IF(A232="","",XLOOKUP(A232,Sales!$A$2:A3664,Sales!$N$2:N3664))
-        order_status_formula=f'=IF(A{next_row}="","",XLOOKUP(A{next_row},Sales!$A$2:A3664,Sales!$M$2:M3664))'
-
-        # =IF(H232="", "", XLOOKUP(H232, Inventory!A$2:A, Inventory!G$2:G, ""))
-        purchase_price_formula=f'=IF(H{next_row}="", "", XLOOKUP(H{next_row}, Inventory!A$2:A, Inventory!G$2:G, ""))'
 
 
         rows_to_insert = []
+        products=0
         for product in req.products:
+            print(f"Inserting nextrow {next_row+products}")
+            #=IF(OR(B232="",C232=""),"","ORD#"&TEXT(C232,"YYYYMMDD")&"-"&TEXT(B232,"00000"))
+            order_id_formula=f'=IF(OR(B{next_row+products}="",C{next_row+products}=""),"","ORD#"&TEXT(C{next_row+products},"YYYYMMDD")&"-"&TEXT(B{next_row+products},"00000"))'
+            #IF(AND(G232<>"", ISNUMBER(FIND("|", G232))), LEFT(G232, FIND("|", G232) - 2), "")
+            product_id_formula=f'=IF(AND(G{next_row+products}<>"", ISNUMBER(FIND("|", G{next_row+products}))), LEFT(G{next_row+products}, FIND("|", G{next_row+products}) - 2), "")'
+            
+            #  =IF(H232="", "", IF(J232="Retail",XLOOKUP(H232, Inventory!A$2:A, Inventory!H$2:H, ""),    XLOOKUP(H232, Inventory!A$2:A, Inventory!I$2:I, "")))
+            product_price_formula=f'=IF(H{next_row+products}="", "", IF(J{next_row+products}="Retail",XLOOKUP(H{next_row+products}, Inventory!A$2:A, Inventory!H$2:H, ""),    XLOOKUP(H{next_row+products}, Inventory!A$2:A, Inventory!I$2:I, "")))'
+            # =IF(OR(I232="", K232=""), "", I232*K232)
+            total_price_formula=f'=IF(OR(I{next_row+products}="", K{next_row+products}=""), "", I{next_row+products}*K{next_row+products})'
+
+            # =IF(A232="","",XLOOKUP(A232,Sales!$A$2:A3664,Sales!$N$2:N3664))
+            order_status_formula=f'=IF(A{next_row+products}="","",XLOOKUP(A{next_row+products},Sales!$A$2:A3664,Sales!$M$2:M3664))'
+
+            # =IF(H232="", "", XLOOKUP(H232, Inventory!A$2:A, Inventory!G$2:G, ""))
+            purchase_price_formula=f'=IF(H{next_row+products}="", "", XLOOKUP(H{next_row+products}, Inventory!A$2:A, Inventory!G$2:G, ""))'
             row = [
                 order_id_formula,          # A: Order ID (formula)
                 str(next_sl),              # B: SL No.
@@ -438,10 +635,33 @@ async def insert_sales_raw(req: InsertOrderRequest, user: dict = Depends(get_cur
                 "",                        # O: Remark
             ]
             rows_to_insert.append(row)
-
+            products+=1
         # Batch update — write all rows at once
         cell_range = f"A{next_row}:O{next_row + len(rows_to_insert) - 1}"
         worksheet.update(values=rows_to_insert, range_name=cell_range, value_input_option="USER_ENTERED")
+        # Get the order id of the first inserted row from the formula (after it calculates)
+        order_id = worksheet.cell(next_row, 1).value
+        print(f"order_id of first inserted row: {order_id}")
+        
+        sales_sheet = sheets.get_worksheet("Sales")
+        #order_id: Optional[str] ----------A column
+        # discounted_price ---------G column
+        # delivery_platform: --------- I column
+        # delivery_charge: delivery_charges --------- J column
+        # sales_by----- O column
+        # Find the next empty row (after all data) ORD#20260330-02004
+        print(req.sales)
+        all_values = sales_sheet.get_all_values()
+        print(f"Current rows in Sales: {len(all_values)}")
+        next_row = len(all_values) + 1  # +1 for header, +1 to get to the next empty row
+        print(f"Next Sales Row: {next_row}")
+        sales_sheet.update_cell(next_row, 1, order_id)  # A: Order ID
+        sales_sheet.update_cell(next_row, 7, req.sales.discounted_price)  # G: Discounted Price
+        sales_sheet.update_cell(next_row, 9, req.sales.delivery_platform)  # I: Delivery Platform
+        # sales_sheet.update_cell(next_row, 10, delivery_charges.get(req.sales.delivery_platform, 0))  # J: Delivery Charge
+        sales_sheet.update_cell(next_row, 14, "Processing")  # Order status N: Discounted Price
+        sales_sheet.update_cell(next_row, 15, req.sales.sales_by)  # O: Sales By
+        
 
         return {
             "success": True,
@@ -462,4 +682,4 @@ async def insert_sales_raw(req: InsertOrderRequest, user: dict = Depends(get_cur
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+venv/
+.venv/
+env/
+
+.git/
+.gitignore
+.vscode/
+.idea/
+
+test.ipynb
+.ipynb_checkpoints/
+
+# These are mounted at runtime via docker-compose.
+credentials.json
+token.json
+
+README.md
+nul
+.claude/

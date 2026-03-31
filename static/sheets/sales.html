@@ -14,6 +14,41 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/sheet-common.css">
+    
+    <style>
+        /* Improve table readability */
+        #dataTable td {
+            text-align: center;
+            vertical-align: middle;
+            padding: 12px 8px;
+            white-space: nowrap;
+        }
+        
+        #dataTable th {
+            text-align: center;
+            vertical-align: middle;
+            padding: 12px 8px;
+            font-weight: 600;
+            background-color: #f8f9fa;
+        }
+        
+        #dataTable tbody tr:hover {
+            background-color: #f1f3f5;
+        }
+        
+        /* Make the Actions column stick to prevent overflow issues */
+        #dataTable td:last-child,
+        #dataTable th:last-child {
+            position: sticky;
+            right: 0;
+            background-color: white;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.05);
+        }
+        
+        #dataTable tbody tr:hover td:last-child {
+            background-color: #f1f3f5;
+        }
+    </style>
 </head>
 <body>
 
@@ -62,12 +97,39 @@
                 <small class="text-muted" id="sheetInfo">Loading...</small>
             </div>
             <div class="d-flex gap-2">
-                <button id="btnRefresh" class="btn btn-sm btn-outline-primary" disabled>
+                <button id="btnRefresh" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                 </button>
                 <button id="btnUpdate" class="btn btn-sm btn-warning" style="display: none;">
                     <i class="bi bi-arrow-repeat me-1"></i>Update Order Statuses
                 </button>
+            </div>
+        </div>
+
+        <!-- Date Range Filter -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label for="dateFrom" class="form-label small mb-1">From Date</label>
+                        <input type="date" class="form-control form-control-sm" id="dateFrom">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="dateTo" class="form-label small mb-1">To Date</label>
+                        <input type="date" class="form-control form-control-sm" id="dateTo">
+                    </div>
+                    <div class="col-md-3">
+                        <button id="btnApplyFilter" class="btn btn-sm btn-primary">
+                            <i class="bi bi-funnel me-1"></i>Apply Filter
+                        </button>
+                        <button id="btnClearFilter" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-x-circle me-1"></i>Clear
+                        </button>
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <small class="text-muted" id="filterInfo">No filter applied</small>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -90,7 +152,7 @@
         </div>
     </main>
 
-    <!-- Scripts -->
+    <!--Scripts -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.datatables.net/2.1.8/js/dataTables.min.js"></script>
@@ -102,7 +164,230 @@
     <script src="/static/js/api.js"></script>
     <script src="/static/js/common.js"></script>
     
-    <!-- Sheet-Specific Script -->
-    <script src="/static/js/sheets/sales.js"></script>
+    <!-- Inline Sales Script with Date Filter -->
+    <script>
+        (function() {
+            const SHEET_NAME = "Sales";
+            let currentDateFrom = null;
+            let currentDateTo = null;
+            let currentDataTable = null;
+            
+            console.log("[SALES-INLINE] Script loaded");
+            
+            // Columns to hide from the table
+            const HIDDEN_COLUMNS = [
+                "date",
+                "return reason",
+                "dispatch date", 
+                "advance payment",
+                "due payment",
+                "sales by"
+            ];
+            
+            // Render table
+            function renderTable(headers, rows, preservePage = false) {
+                console.log("[SALES-INLINE] Rendering table with", rows.length, "rows");
+                
+                let currentPage = 0;
+                if (preservePage && currentDataTable) {
+                    currentPage = currentDataTable.page();
+                }
+                
+                if (currentDataTable) {
+                    currentDataTable.destroy();
+                    currentDataTable = null;
+                }
+                
+                const dataTable = document.getElementById("dataTable");
+                const thead = dataTable.querySelector("thead");
+                const tbody = dataTable.querySelector("tbody");
+                thead.innerHTML = "";
+                tbody.innerHTML = "";
+                
+                // Find indices in original headers (before filtering)
+                const orderIdIdx = headers.findIndex(h => h === "Order ID");
+                const consignmentIdIdx = headers.findIndex(h => h === "Consignment ID");
+                
+                // Filter headers to hide unwanted columns
+                const visibleColumnIndices = [];
+                const visibleHeaders = [];
+                headers.forEach((h, i) => {
+                    const headerLower = (h || "").toLowerCase().trim();
+                    if (!HIDDEN_COLUMNS.includes(headerLower)) {
+                        visibleHeaders.push(h);
+                        visibleColumnIndices.push(i);
+                    }
+                });
+                
+                // Build header
+                const headerRow = document.createElement("tr");
+                visibleHeaders.forEach((h) => {
+                    const th = document.createElement("th");
+                    th.textContent = h || "(empty)";
+                    headerRow.appendChild(th);
+                });
+                const actionsHeader = document.createElement("th");
+                actionsHeader.textContent = "Actions";
+                actionsHeader.style.width = "100px";
+                headerRow.appendChild(actionsHeader);
+                thead.appendChild(headerRow);
+                
+                // Build body
+                rows.forEach((row) => {
+                    const tr = document.createElement("tr");
+                    visibleColumnIndices.forEach((i) => {
+                        const td = document.createElement("td");
+                        const cellValue = row[i] !== undefined ? row[i] : "";
+                        td.textContent = cellValue;
+                        tr.appendChild(td);
+                    });
+                    
+                    const actionsTd = document.createElement("td");
+                    const orderId = orderIdIdx >= 0 ? row[orderIdIdx] : null;
+                    const consignmentId = consignmentIdIdx >= 0 ? row[consignmentIdIdx] : null;
+                    
+                    if (consignmentId && consignmentId.trim() !== "") {
+                        const updateBtn = document.createElement("button");
+                        updateBtn.className = "btn btn-sm btn-outline-primary";
+                        updateBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
+                        updateBtn.title = "Update Status";
+                        updateBtn.onclick = () => updateSingleStatus(orderId);
+                        actionsTd.appendChild(updateBtn);
+                    }
+                    tr.appendChild(actionsTd);
+                    tbody.appendChild(tr);
+                });
+                
+                document.getElementById("emptyState").classList.add("d-none");
+                document.getElementById("tableWrapper").classList.remove("d-none");
+                
+                currentDataTable = new DataTable("#dataTable", {
+                    pageLength: 25,
+                    lengthMenu: [10, 25, 50, 100],
+                    order: [],
+                    scrollX: true,
+                    columnDefs: [{ targets: -1, orderable: false }]
+                });
+                
+                if (preservePage && currentPage > 0) {
+                    currentDataTable.page(currentPage).draw('page');
+                }
+                
+                document.getElementById("sheetInfo").textContent = `${rows.length} rows, ${visibleHeaders.length} columns`;
+                updateFilterInfo();
+                
+                console.log("[SALES-INLINE] Table rendered successfully");
+            }
+            
+            function updateFilterInfo() {
+                const filterInfoEl = document.getElementById("filterInfo");
+                if (currentDateFrom || currentDateTo) {
+                    let text = "Filter: ";
+                    if (currentDateFrom && currentDateTo) {
+                        text += `${currentDateFrom} to ${currentDateTo}`;
+                    } else if (currentDateFrom) {
+                        text += `From ${currentDateFrom}`;
+                    } else if (currentDateTo) {
+                        text += `Until ${currentDateTo}`;
+                    }
+                    filterInfoEl.textContent = text;
+                    filterInfoEl.classList.remove("text-muted");
+                    filterInfoEl.classList.add("text-primary", "fw-semibold");
+                } else {
+                    filterInfoEl.textContent = "No filter applied";
+                    filterInfoEl.classList.remove("text-primary", "fw-semibold");
+                    filterInfoEl.classList.add("text-muted");
+                }
+            }
+            
+            function updateSingleStatus(orderId) {
+                console.log("[SALES-INLINE] Updating status for:", orderId);
+                const token = localStorage.getItem('auth_token');
+                
+                fetch(`/api/update-status/${encodeURIComponent(orderId)}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.json();
+                })
+                .then(result => {
+                    ui.showToast(`Status updated for ${orderId}: ${result.status}`, "success");
+                    setTimeout(() => loadSalesData(true), 500);
+                })
+                .catch(err => {
+                    ui.showToast(`Failed to update status: ${err.message}`, "danger");
+                });
+            }
+            
+            function loadSalesData(preservePage = false) {
+                console.log("[SALES-INLINE] Loading sales data...");
+                ui.showLoading("Loading Sales data...");
+                
+                let url = `/api/sheets/Sales`;
+                const params = new URLSearchParams();
+                if (currentDateFrom) params.append('date_from', currentDateFrom);
+                if (currentDateTo) params.append('date_to', currentDateTo);
+                if (params.toString()) url += '?' + params.toString();
+                
+                const token = localStorage.getItem('auth_token');
+                
+                fetch(url, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(`[SALES-INLINE] Received ${data.rows.length} rows`);
+                    renderTable(data.headers, data.rows, preservePage);
+                    ui.hideLoading();
+                })
+                .catch(err => {
+                    ui.showToast(`Failed to load Sales: ${err.message}`, "danger");
+                    ui.hideLoading();
+                });
+            }
+            
+            function init() {
+                console.log("[SALES-INLINE] Initializing...");
+                
+                if (!auth.checkAuth()) return;
+                
+                ui.setupUserProfile();
+                
+                // Setup navigation
+                api.fetchSheets().then(data => {
+                    ui.populateSidebar(data.sheets);
+                    ui.setActiveSheet(SHEET_NAME);
+                });
+                
+                loadSalesData();
+                
+                // Event listeners
+                document.getElementById("btnRefresh").addEventListener("click", () => loadSalesData());
+                document.getElementById("btnApplyFilter").addEventListener("click", () => {
+                    currentDateFrom = document.getElementById("dateFrom").value || null;
+                    currentDateTo = document.getElementById("dateTo").value || null;
+                    loadSalesData();
+                });
+                document.getElementById("btnClearFilter").addEventListener("click", () => {
+                    document.getElementById("dateFrom").value = "";
+                    document.getElementById("dateTo").value = "";
+                    currentDateFrom = null;
+                    currentDateTo = null;
+                    loadSalesData();
+                });
+                
+                ui.showForRole("btnUpdate", "admin");
+                
+                console.log("[SALES-INLINE] Init complete");
+            }
+            
+            document.addEventListener("DOMContentLoaded", init);
+        })();
+    </script>
 </body>
 </html>

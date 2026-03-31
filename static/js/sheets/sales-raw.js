@@ -1,6 +1,6 @@
 // ──Sales Raw Sheet Module ─────────────────────────────────────────────────
 
-(function() {
+(function () {
     const SHEET_NAME = "Sales Raw";
     let dataTableInstance = null;
     let productsList = [];
@@ -118,6 +118,129 @@
         return html;
     }
 
+    function extractPriceFromProductDetails(productDetailsText) {
+        if (!productDetailsText) return "";
+
+        // Normalize whitespace (Select2 / HTML can include NBSP)
+        const text = String(productDetailsText).replace(/\u00A0/g, " ").trim();
+
+        // Preferred formats:
+        //   "... -- 350"
+        //   "... – 350" (en-dash)
+        //   "... — 350" (em-dash)
+        // Allow optional currency suffix: tk / taka / ৳
+        const markerMatch = text.match(/(?:--|–|—)\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:৳|tk|taka)?\b/i);
+        if (markerMatch) return markerMatch[1];
+
+        // Fallback: last numeric token before optional currency
+        const tailNumberMatch = text.match(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:৳|tk|taka)?\s*$/i);
+        if (tailNumberMatch) return tailNumberMatch[1];
+
+        return "";
+    }
+
+    function parseAmount(val) {
+        if (val === null || val === undefined) return 0;
+        const n = Number(String(val).replace(/,/g, "").trim());
+        return Number.isFinite(n) ? n : 0;
+    }
+
+    const DELIVERY_CHARGES = {
+        "Pathao Inside": 70,
+        "Pathao Outside": 110,
+        "Steadfast Inside": 70,
+        "Steadfast Outside": 110,
+        "Personal Dev": 0,
+        "Pathao Subcity": 90,
+        "Steadfast Subcity": 90,
+    };
+
+    function updatePayableAmount() {
+        const totalEl = document.getElementById("TotalPrice");
+        const chargeEl = document.getElementById("deliveryCharge");
+        const discountEl = document.getElementById("discountedPrice");
+        const payableEl = document.getElementById("payableAmount");
+        if (!payableEl) return;
+
+        const totalProductPrice = parseAmount(totalEl ? totalEl.value : 0);
+        const deliveryCharge = parseAmount(chargeEl ? chargeEl.value : 0);
+        const discountedPrice = parseAmount(discountEl ? discountEl.value : 0);
+
+        // Payable = Total product price + Delivery charges - (Discounted price)
+        // Discount can be negative; subtracting a negative will add it.
+        payableEl.value = String(totalProductPrice + deliveryCharge - discountedPrice);
+    }
+
+    function updateDeliveryChargeDisplay() {
+        const platformEl = document.getElementById("deliveryPlatform");
+        const chargeEl = document.getElementById("deliveryCharge");
+        if (!platformEl || !chargeEl) return;
+
+        const platform = platformEl.value;
+        if (!platform) {
+            chargeEl.value = "";
+            return;
+        }
+
+        const charge = Object.prototype.hasOwnProperty.call(DELIVERY_CHARGES, platform)
+            ? DELIVERY_CHARGES[platform]
+            : "";
+
+        chargeEl.value = charge === "" ? "" : String(charge);
+
+        updatePayableAmount();
+    }
+
+    function getSelectedProductText(selectEl) {
+        try {
+            // Prefer Select2's display text if available
+            if (window.jQuery && selectEl && window.jQuery(selectEl).data("select2")) {
+                const data = window.jQuery(selectEl).select2("data");
+                if (Array.isArray(data) && data[0] && typeof data[0].text === "string") {
+                    return data[0].text;
+                }
+            }
+        } catch {
+            // ignore and fall back
+        }
+
+        // Plain select fallback
+        const opt = selectEl && selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex] : null;
+        return (opt && opt.text) ? opt.text : (selectEl ? selectEl.value : "");
+    }
+
+    function updateProductRowPrice(rowEl) {
+        const selectEl = rowEl.querySelector(".product-select");
+        const priceEl = rowEl.querySelector(".product-price");
+        if (!selectEl || !priceEl) return;
+
+        const qtyInput = rowEl.querySelector(".product-qty");
+        const qty = Math.max(0, parseAmount(qtyInput ? qtyInput.value : 0));
+
+        const selectedText = getSelectedProductText(selectEl);
+        const unitPriceRaw = extractPriceFromProductDetails(selectedText);
+        const unitPrice = parseAmount(unitPriceRaw);
+
+        const lineTotal = unitPrice * qty;
+        priceEl.value = lineTotal ? String(lineTotal) : "";
+    }
+
+    function updateTotalProductsPrice() {
+        const totalEl = document.getElementById("TotalPrice");
+        if (!totalEl) return;
+
+        const rows = document.querySelectorAll("#productList .product-row");
+        let sum = 0;
+        rows.forEach((rowEl) => {
+            const rowTotalEl = rowEl.querySelector(".product-price");
+            sum += parseAmount(rowTotalEl ? rowTotalEl.value : 0);
+        });
+
+        totalEl.value = String(sum);
+
+        updatePayableAmount();
+    }
+
     /**
      * Add a product row to the form
      */
@@ -141,6 +264,11 @@
                 <label class="form-label mb-1" style="font-size:0.8rem;">Qty</label>
                 <input type="number" class="form-control form-control-sm product-qty" min="1" value="1" required>
             </div>
+            <div class="price-wrapper">
+                <label class="form-label mb-1" style="font-size:0.8rem;">Price</label>
+                <input type="text" class="form-control form-control-sm product-price" value="" readonly>
+            </div>
+
             <div class="remove-btn-wrapper">
                 <label class="form-label mb-1" style="font-size:0.8rem;">&nbsp;</label>
                 <button type="button" class="btn btn-outline-danger btn-sm remove-product-btn" data-row-id="productRow_${idx}" title="Remove">
@@ -159,9 +287,52 @@
             allowClear: true,
             dropdownParent: $('#insertOrderModal')
         });
+        // console.log(`Added product row with ID: productRow_${idx}`);
+        // add another product-select change listener to handle price updates when product is changed via Select2 
+        const qtyEl = div.querySelector('.product-qty');
+        const selectEl = div.querySelector('.product-select');
+
+        // Quantity change
+        qtyEl?.addEventListener('input', () => {
+            updateProductRowPrice(div);
+            updateTotalProductsPrice();
+        });
+
+        // Product selection change
+        selectEl?.addEventListener('change', () => {
+            updateProductRowPrice(div);
+            updateTotalProductsPrice();
+        });
+
+        // Select2 events (more reliable when using Select2 UI)
+        try {
+            const $select = window.jQuery ? window.jQuery(selectEl) : null;
+            if ($select) {
+                $select.on('select2:select', () => {
+                    // console.log(`[price] select2:select fired for productRow_${idx}`);
+                    updateProductRowPrice(div);
+                    updateTotalProductsPrice();
+                });
+                $select.on('select2:clear', () => {
+                    // console.log(`[price] select2:clear fired for productRow_${idx}`);
+                    updateProductRowPrice(div);
+                    updateTotalProductsPrice();
+                });
+                // Some Select2 setups only trigger plain 'change'
+                $select.on('change', () => {
+                    // console.log(`[price] jquery change fired for productRow_${idx}`);
+                    updateProductRowPrice(div);
+                    updateTotalProductsPrice();
+                });
+            }
+        } catch (e) {
+            console.warn("[price] failed to attach select2 events", e);
+        }
+        updateProductRowPrice(div);
+        updateTotalProductsPrice();
 
         // Attach remove handler
-        div.querySelector('.remove-product-btn').addEventListener('click', function() {
+        div.querySelector('.remove-product-btn').addEventListener('click', function () {
             removeProductRow(this.getAttribute('data-row-id'));
         });
     }
@@ -176,6 +347,7 @@
             $(row).find('.product-select').select2('destroy');
             row.remove();
             renumberProductBadges();
+            updateTotalProductsPrice();
         } else if (container.children.length <= 1) {
             ui.showToast("At least one product is required.", "warning");
         }
@@ -211,8 +383,13 @@
         const today = common.formatDateForInput(common.getToday());
         document.getElementById("orderDate").value = today;
 
+        // Reset derived UI-only fields
+        updateDeliveryChargeDisplay();
+        updatePayableAmount();
+
         // Add first product row
         addProductRow();
+        updateTotalProductsPrice();
     }
 
     /**
@@ -220,6 +397,8 @@
      */
     async function submitInsertOrder() {
         const btn = document.getElementById("btnSubmitOrder");
+        // console.log("Submit button:", btn);
+        // console.log("IN the order insert javascript.");
 
         // Gather customer info
         const date = document.getElementById("orderDate").value;
@@ -228,9 +407,39 @@
         const customerAddress = document.getElementById("customerAddress").value.trim();
         const customerType = document.getElementById("customerType").value;
 
+        // Gather sales info
+        const discountedPriceRaw = document.getElementById("discountedPrice").value.trim();
+        // const totalPriceRaw = (document.getElementById("payableAmount")?.value ?? document.getElementById("TotalPrice")?.value ?? "").trim();
+        const totalPriceRaw = document.getElementById("payableAmount")?.value.trim();
+        const deliveryPlatform = document.getElementById("deliveryPlatform").value;
+        const salesBy = document.getElementById("salesBy").value;
+        // console.log("Collected form data:", {
+        //     date, customerName, customerContact, customerAddress, customerType,
+        //     discountedPriceRaw, totalPriceRaw, deliveryPlatform, salesBy
+        // });
         // Validate
         if (!date || !customerName || !customerContact || !customerAddress) {
             ui.showToast("Please fill in all required customer fields.", "warning");
+            return;
+        }
+
+        if (!deliveryPlatform || !salesBy) {
+            ui.showToast("Please fill in all required sales fields.", "warning");
+            return;
+        }
+
+        const discountedPrice = Number(discountedPriceRaw);
+        const totalPrice = Number(totalPriceRaw);
+        // console.log("Parsed prices:", { discountedPrice, totalPrice });
+        // // Show their types in console for debugging
+        
+        // console.log("Types of parsed prices:", {
+        //     discountedPrice: typeof discountedPrice,
+        //     totalPrice: typeof totalPrice
+        // });
+
+        if (Number.isNaN(discountedPrice) || Number.isNaN(totalPrice)) {
+            ui.showToast("Discounted price and total price must be numeric.", "warning");
             return;
         }
 
@@ -276,9 +485,15 @@
                 customer_contact: customerContact,
                 customer_address: customerAddress,
                 customer_type: customerType,
-                products: products
+                products: products,
+                sales: {
+                    discounted_price: discountedPrice,
+                    total_price: totalPrice,
+                    delivery_platform: deliveryPlatform,
+                    sales_by: salesBy
+                }
             });
-
+            // console.log("Insert order response:", data);
             // Close modal
             const modalEl = document.getElementById("insertOrderModal");
             const modal = bootstrap.Modal.getInstance(modalEl);
@@ -323,10 +538,29 @@
         // Setup event listeners
         document.getElementById("btnRefresh").addEventListener("click", refresh);
         document.getElementById("btnAddProduct").addEventListener("click", addProductRow);
-        document.getElementById("btnSubmitOrder").addEventListener("click", submitInsertOrder);
+        document.getElementById("btnSubmitOrder").addEventListener("click", (event) => {
+            event.preventDefault();
+            submitInsertOrder();
+        });
+
+        const insertForm = document.getElementById("insertOrderForm");
+        insertForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            submitInsertOrder();
+        });
 
         // Open modal when Insert button clicked
         document.getElementById("insertOrderModal").addEventListener("show.bs.modal", openInsertOrderModal);
+
+        // Frontend-only: auto-fill delivery charge based on selected platform
+        document.getElementById("deliveryPlatform")?.addEventListener("change", updateDeliveryChargeDisplay);
+
+        // Frontend-only: auto-fill payable amount when discount changes
+        document.getElementById("discountedPrice")?.addEventListener("input", updatePayableAmount);
+        document.getElementById("discountedPrice")?.addEventListener("change", updatePayableAmount);
+
+        updateDeliveryChargeDisplay();
+        updatePayableAmount();
 
         // Show Insert button only for admin
         ui.showForRole("btnInsert", "admin");
