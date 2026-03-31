@@ -6,6 +6,7 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 from google.auth.exceptions import DefaultCredentialsError
+from get_credential_path import load_credentials
 
 # Regex to extract URL from =IMAGE("url", ...) or =Image("url", ...)
 _IMAGE_FORMULA_RE = re.compile(r'=\s*[Ii][Mm][Aa][Gg][Ee]\s*\(\s*"([^"]+)"', re.IGNORECASE)
@@ -77,7 +78,9 @@ class SheetsService:
         self.config = _load_config()
 
         try:
-            creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
+            # creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
+            creds_data = load_credentials()
+            creds = Credentials.from_service_account_info(creds_data, scopes=SCOPES)
         except FileNotFoundError:
             raise FileNotFoundError(
                 "credentials.json not found. Place it in the same directory as this script."
