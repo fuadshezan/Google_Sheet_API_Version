@@ -5,6 +5,7 @@
     let dataTableInstance = null;
     let productsList = [];
     let productRowCounter = 0;
+    let orderInsertedDuringSession = false;
 
     /**
      * Load Sales Raw sheet data
@@ -143,6 +144,102 @@
         if (val === null || val === undefined) return 0;
         const n = Number(String(val).replace(/,/g, "").trim());
         return Number.isFinite(n) ? n : 0;
+    }
+
+    /**
+     * Normalize and validate a Bangladeshi phone number.
+     *
+     * Steps:
+     *  1. Remove all whitespace and special characters (+, -, etc.)
+     *  2. Convert Bengali digits (০-৯) to English digits (0-9)
+     *  3. Strip leading country code "88" if present
+     *  4. Validate that the result is exactly 11 digits
+     *
+     * @param {string} raw  – The raw phone number input
+     * @returns {{ valid: boolean, number: string, error?: string }}
+     */
+    function normalizePhoneNumber(raw) {
+        if (!raw) return { valid: false, number: "", converted: false, error: "Phone number is empty." };
+
+        // 1. Strip all whitespace and non-digit / non-Bengali-digit characters
+        //    Keep only 0-9 and Bengali ০-৯
+        let cleaned = String(raw).replace(/[^0-9\u09E6-\u09EF]/g, "");
+
+        // 2. Convert Bengali digits to English digits
+        //    Bengali ০ = U+09E6 … ৯ = U+09EF
+        const hasBengali = /[\u09E6-\u09EF]/.test(cleaned);
+        cleaned = cleaned.replace(/[\u09E6-\u09EF]/g, (ch) =>
+            String(ch.charCodeAt(0) - 0x09E6)
+        );
+
+        // 3. Remove leading country code "88"
+        if (cleaned.startsWith("88")) {
+            cleaned = cleaned.substring(2);
+        }
+
+        // 4. Validate: must be exactly 11 digits
+        if (cleaned.length !== 11) {
+            return {
+                valid: false,
+                number: cleaned,
+                converted: hasBengali,
+                error: `Phone number must be 11 digits (got ${cleaned.length}).`
+            };
+        }
+
+        if (!/^\d{11}$/.test(cleaned)) {
+            return { valid: false, number: cleaned, converted: hasBengali, error: "Phone number contains non-numeric characters." };
+        }
+
+        return { valid: true, number: cleaned, converted: hasBengali };
+    }
+
+    /**
+     * Live-validate the customer contact field.
+     * - Green shadow when valid
+     * - Error hint text when invalid
+     * - Auto-replaces Bengali digits with English in the field
+     */
+    function validateContactField() {
+        const input = document.getElementById("customerContact");
+        if (!input) return;
+
+        const rawValue = input.value.trim();
+
+        // Get or create the error hint element
+        let hint = document.getElementById("contactValidationHint");
+        if (!hint) {
+            hint = document.createElement("div");
+            hint.id = "contactValidationHint";
+            hint.className = "contact-validation-hint";
+            input.parentNode.appendChild(hint);
+        }
+
+        // If the field is empty, reset to neutral state
+        if (!rawValue) {
+            input.classList.remove("contact-valid", "contact-invalid");
+            hint.textContent = "";
+            hint.style.display = "none";
+            return;
+        }
+
+        const result = normalizePhoneNumber(rawValue);
+
+        if (result.valid) {
+            // If Bengali digits were present, replace the field value with the converted English number
+            if (result.converted) {
+                input.value = result.number;
+            }
+            input.classList.add("contact-valid");
+            input.classList.remove("contact-invalid");
+            hint.textContent = "";
+            hint.style.display = "none";
+        } else {
+            input.classList.add("contact-invalid");
+            input.classList.remove("contact-valid");
+            hint.textContent = result.error;
+            hint.style.display = "block";
+        }
     }
 
     const DELIVERY_CHARGES = {
@@ -377,10 +474,40 @@
             return;
         }
 
+        // Reset the session flag
+        orderInsertedDuringSession = false;
+
         // Reset form
+        resetInsertForm();
+    }
+
+    /**
+     * Reset the insert order form for the next entry
+     */
+    function resetInsertForm() {
+        // Destroy any existing Select2 instances before clearing
+        document.querySelectorAll('#productList .product-select').forEach((el) => {
+            try {
+                if (window.jQuery && window.jQuery(el).data('select2')) {
+                    window.jQuery(el).select2('destroy');
+                }
+            } catch (e) { /* ignore */ }
+        });
+
         document.getElementById("insertOrderForm").reset();
         document.getElementById("productList").innerHTML = "";
         productRowCounter = 0;
+
+        // Clear contact validation state
+        const contactEl = document.getElementById("customerContact");
+        if (contactEl) {
+            contactEl.classList.remove("contact-valid", "contact-invalid");
+        }
+        const hint = document.getElementById("contactValidationHint");
+        if (hint) {
+            hint.textContent = "";
+            hint.style.display = "none";
+        }
 
         // Set today's date
         const today = common.formatDateForInput(common.getToday());
@@ -406,20 +533,24 @@
         // Gather customer info
         const date = document.getElementById("orderDate").value;
         const customerName = document.getElementById("customerName").value.trim();
-        const customerContact = document.getElementById("customerContact").value.trim();
+        const customerContactRaw = document.getElementById("customerContact").value.trim();
         const customerAddress = document.getElementById("customerAddress").value.trim();
         const customerType = document.getElementById("customerType").value;
 
+        // Normalize & validate phone number
+        const phoneResult = normalizePhoneNumber(customerContactRaw);
+        if (!phoneResult.valid) {
+            ui.showToast(`Invalid phone number: ${phoneResult.error}`, "warning");
+            return;
+        }
+        const customerContact = phoneResult.number;
+
         // Gather sales info
         const discountedPriceRaw = document.getElementById("discountedPrice").value.trim();
-        // const totalPriceRaw = (document.getElementById("payableAmount")?.value ?? document.getElementById("TotalPrice")?.value ?? "").trim();
         const totalPriceRaw = document.getElementById("payableAmount")?.value.trim();
         const deliveryPlatform = document.getElementById("deliveryPlatform").value;
         const salesBy = document.getElementById("salesBy").value;
-        // console.log("Collected form data:", {
-        //     date, customerName, customerContact, customerAddress, customerType,
-        //     discountedPriceRaw, totalPriceRaw, deliveryPlatform, salesBy
-        // });
+
         // Validate
         if (!date || !customerName || !customerContact || !customerAddress) {
             ui.showToast("Please fill in all required customer fields.", "warning");
@@ -496,16 +627,13 @@
                     sales_by: salesBy
                 }
             });
-            // console.log("Insert order response:", data);
-            // Close modal
-            const modalEl = document.getElementById("insertOrderModal");
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
+            // Mark that an order was inserted during this session
+            orderInsertedDuringSession = true;
 
             ui.showToast(data.message || "Order inserted successfully!", "success");
 
-            // Refresh data
-            refresh();
+            // Reset the form for the next insertion (keep modal open)
+            resetInsertForm();
 
         } catch (err) {
             ui.showToast(`Failed to insert order: ${err.message}`, "danger");
@@ -556,8 +684,21 @@
         // Open modal when Insert button clicked
         document.getElementById("insertOrderModal").addEventListener("show.bs.modal", openInsertOrderModal);
 
+        // Refresh data when the modal is manually closed (only if orders were inserted)
+        document.getElementById("insertOrderModal").addEventListener("hidden.bs.modal", () => {
+            if (orderInsertedDuringSession) {
+                orderInsertedDuringSession = false;
+                refresh();
+            }
+        });
+
         // Frontend-only: auto-fill delivery charge based on selected platform
         document.getElementById("deliveryPlatform")?.addEventListener("change", updateDeliveryChargeDisplay);
+
+        // Live phone number validation on the contact field
+        const contactInput = document.getElementById("customerContact");
+        contactInput?.addEventListener("input", validateContactField);
+        contactInput?.addEventListener("blur", validateContactField);
 
         // Frontend-only: auto-fill payable amount when discount changes
         document.getElementById("discountedPrice")?.addEventListener("input", updatePayableAmount);

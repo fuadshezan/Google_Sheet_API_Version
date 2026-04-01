@@ -207,3 +207,39 @@
         line-height: 30px !important;
     }
 }
+
+/* ── Contact number validation feedback ──────────────────────────────────── */
+#customerContact.contact-valid {
+    border-color: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+}
+
+#customerContact.contact-valid:focus {
+    border-color: #16a34a;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.35);
+}
+
+#customerContact.contact-invalid {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+#customerContact.contact-invalid:focus {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+}
+
+.contact-validation-hint {
+    display: none;
+    font-size: 0.75rem;
+    color: #ef4444;
+    margin-top: 4px;
+    line-height: 1.3;
+    font-weight: 500;
+}
+
+@media (max-width: 575.98px) {
+    .contact-validation-hint {
+        font-size: 0.68rem;
+    }
+}
