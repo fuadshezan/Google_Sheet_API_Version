@@ -259,6 +259,137 @@ class PathaoCourier:
 
         print(f"  ERROR [{resp.status_code}] for {consignment_id}: {resp.text[:200]}")
         return None
+    def get_city_list(self):
+        """
+        Get list of cities from Pathao API.
+
+        Returns:
+            list: List of cities, or None on failure.
+        """
+        #{{base_url}}/aladdin/api/v1/city-list'
+        url = f"{self.base_url}/aladdin/api/v1/city-list"
+
+        try:
+            resp = requests.get(url, headers=self._headers(), timeout=_TIMEOUT)
+        except requests.RequestException as e:
+            print(f"  ERROR: Failed to fetch city list: {e}")
+            return None
+
+        if resp.status_code == 200:
+            try:
+                return resp.json().get("data", resp.json())
+            except ValueError:
+                print("  ERROR: Non-JSON response when fetching city list.")
+                return None
+
+        print(f"  ERROR [{resp.status_code}] fetching city list: {resp.text[:200]}")
+        return None
+
+    def get_zones_by_city(self, city_id):
+        """
+        Get list of zones for a given city ID.
+
+        Args:
+            city_id (int): The ID of the city.
+
+        Returns:
+            list: List of zones for the specified city, or None on failure.
+        """
+        #/aladdin/api/v1/cities/{{city_id}}/zone-list
+        url = f"{self.base_url}/aladdin/api/v1/cities/{city_id}/zone-list"
+
+        try:
+            resp = requests.get(url, headers=self._headers(), timeout=_TIMEOUT)
+        except requests.RequestException as e:
+            print(f"  ERROR: Failed to fetch zones for city {city_id}: {e}")
+            return None
+
+        if resp.status_code == 200:
+            try:
+                return resp.json().get("data", resp.json())
+            except ValueError:
+                print(f"  ERROR: Non-JSON response when fetching zones for city {city_id}.")
+                return None
+
+        print(f"  ERROR [{resp.status_code}] fetching zones for city {city_id}: {resp.text[:200]}")
+        return None
+    def get_area_of_a_zone(self, zone_id):
+        """
+        Get list of areas for a given zone ID.
+
+        Args:
+            zone_id (int): The ID of the zone.
+        Returns:
+            list: List of areas for the specified zone, or None on failure.
+        """
+        #{{base_url}}/aladdin/api/v1/zones/{{zone_id}}/area-list
+        url = f"{self.base_url}/aladdin/api/v1/zones/{zone_id}/area-list"
+
+        try:
+            resp = requests.get(url, headers=self._headers(), timeout=_TIMEOUT)
+        except requests.RequestException as e:
+            print(f"  ERROR: Failed to fetch areas for zone {zone_id}: {e}")
+            return None
+
+        if resp.status_code == 200:
+            try:
+                return resp.json().get("data", resp.json())
+            except ValueError:
+                print(f"  ERROR: Non-JSON response when fetching areas for zone {zone_id}.")
+                return None
+
+        print(f"  ERROR [{resp.status_code}] fetching areas for zone {zone_id}: {resp.text[:200]}")
+        return None
+    
+    def delivery_charge_calculation(self, store_id, item_type, delivery_type, item_weight, recipient_city, recipient_zone):
+        """
+        curl --location '{{base_url}}/aladdin/api/v1/merchant/price-plan'
+            --header 'Content-Type: application/json; charset=UTF-8'
+            --header 'Authorization: Bearer {{issue_token}}'
+            --data '{
+            "store_id": "{{merchant_store_id}}",
+            "item_type": 2,
+            "delivery_type": 48,
+            "item_weight": 0.5,
+            "recipient_city": {{city_id}},
+            "recipient_zone": {{zone_id}}
+            }'
+        item_type: 1 for documents, 2 for parcel, delivery_type: 48 for normal,12 for express
+        item_weight in kg, recipient_city is city_id, recipient_zone is zone_id
+        Calculate delivery charge based on city, weight, and zone.
+
+        Args:
+            city_id (int): The ID of the city.
+            weight (float): The weight of the package in kg.
+            zone_id (int): The ID of the delivery zone.
+        Returns:
+            dict: Delivery charge details from the API, or None on failure.
+        """
+        url = f"{self.base_url}/aladdin/api/v1/merchant/price-plan"
+        payload = {
+            "store_id": store_id,
+            "item_type": item_type,
+            "delivery_type": delivery_type,
+            "item_weight": item_weight,
+            "recipient_city": recipient_city,
+            "recipient_zone": recipient_zone
+        }
+
+        try:
+            resp = requests.post(url, json=payload, headers=self._headers(), timeout=_TIMEOUT)
+        except requests.RequestException as e:
+            print(f"  ERROR: Failed to calculate delivery charge: {e}")
+            return None
+
+        if resp.status_code == 200:
+            try:
+                return resp.json().get("data", resp.json())
+            except ValueError:
+                print("  ERROR: Non-JSON response when calculating delivery charge.")
+                return None
+
+        print(f"  ERROR [{resp.status_code}] calculating delivery charge: {resp.text[:200]}")
+        return None
 
 
 # ── Entry Point (standalone usage) ───────────────────────────────────────────

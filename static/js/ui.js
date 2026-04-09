@@ -200,6 +200,27 @@ const ui = (function() {
             sheetList.appendChild(link);
         });
 
+        // Add Settings link for admin users
+        const user = auth.getCurrentUser();
+        if (user && user.role === "admin") {
+            const divider = document.createElement("div");
+            divider.className = "sidebar-section-label";
+            divider.textContent = "Admin";
+            sheetList.appendChild(divider);
+
+            const settingsLink = document.createElement("a");
+            settingsLink.className = "nav-link";
+            settingsLink.href = "/settings";
+            settingsLink.innerHTML = `<i class="bi bi-gear-fill"></i><span>Settings</span>`;
+
+            // Mark active if on settings page
+            if (window.location.pathname === "/settings") {
+                settingsLink.classList.add("active");
+            }
+
+            sheetList.appendChild(settingsLink);
+        }
+
         // Re-wire close on click after population
         sheetList.querySelectorAll(".nav-link").forEach(link => {
             link.addEventListener("click", () => {

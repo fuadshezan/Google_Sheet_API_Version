@@ -1,0 +1,584 @@
+/* ── Settings Page Styles ─────────────────────────────────────────────────── */
+
+/* Page header */
+.settings-header {
+    padding: 28px 28px 20px;
+}
+
+.settings-header h1 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.settings-header p {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* Toolbar */
+.settings-toolbar {
+    padding: 0 28px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.settings-toolbar .btn {
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all var(--transition);
+}
+
+.btn-add-sheet {
+    background: linear-gradient(135deg, var(--accent), #a855f7);
+    color: #fff;
+    border: none;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.btn-add-sheet:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    color: #fff;
+}
+
+/* Config cards grid */
+.config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 20px;
+    padding: 0 28px 28px;
+}
+
+/* Individual config card */
+.config-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition), transform var(--transition);
+}
+
+.config-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.config-card.collapsed .config-card-body {
+    display: none;
+}
+
+.config-card.collapsed .config-card-footer {
+    display: none;
+}
+
+/* Card header */
+.config-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--transition);
+}
+
+.config-card-header:hover {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e8ecf1 100%);
+}
+
+.config-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.config-card-title .sheet-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), #a855f7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.config-card-title h3 {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.2;
+}
+
+.config-card-title .sheet-badges {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 3px;
+}
+
+.config-card-title .sheet-badges .badge {
+    font-size: 0.62rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+}
+
+.config-card-chevron {
+    font-size: 1rem;
+    color: var(--text-muted);
+    transition: transform 0.3s ease;
+}
+
+.config-card.collapsed .config-card-chevron {
+    transform: rotate(-90deg);
+}
+
+/* Card body */
+.config-card-body {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* Form groups */
+.config-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.config-field label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.config-field input[type="text"],
+.config-field input[type="number"],
+.config-field textarea {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+    background: var(--surface);
+    transition: border-color var(--transition), box-shadow var(--transition);
+    width: 100%;
+}
+
+.config-field input:focus,
+.config-field textarea:focus {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.config-field textarea {
+    resize: vertical;
+    min-height: 60px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.config-field .field-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    opacity: 0.7;
+    line-height: 1.3;
+}
+
+/* Two-column row */
+.config-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+/* Toggle switch */
+.config-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.config-toggle .form-check-input {
+    width: 38px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.config-toggle .form-check-input:checked {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.config-toggle .toggle-label {
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* Roles checkboxes */
+.roles-group {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.roles-group .form-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.roles-group .form-check-input {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.roles-group .form-check-input:checked {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.roles-group .form-check-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+/* Role columns section */
+.role-columns-section {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: #fafbfc;
+}
+
+.role-columns-section h4 {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.role-columns-entry {
+    margin-bottom: 10px;
+}
+
+.role-columns-entry:last-child {
+    margin-bottom: 0;
+}
+
+.role-columns-entry label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: capitalize;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.role-columns-entry input {
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 0.8rem;
+    width: 100%;
+    transition: border-color var(--transition);
+}
+
+.role-columns-entry input:focus {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+/* Card footer */
+.config-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    background: #fafbfc;
+}
+
+.config-card-footer .btn {
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 7px;
+    padding: 6px 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all var(--transition);
+}
+
+.btn-save-sheet {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+}
+
+.btn-save-sheet:hover {
+    background: var(--accent-light);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.btn-save-sheet:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-delete-sheet {
+    background: rgba(239, 68, 68, 0.08);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.btn-delete-sheet:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+}
+
+/* Add sheet modal */
+.add-sheet-modal .modal-content {
+    border: none;
+    border-radius: 16px;
+    box-shadow: var(--shadow-lg);
+}
+
+.add-sheet-modal .modal-header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 22px;
+}
+
+.add-sheet-modal .modal-header .modal-title {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.add-sheet-modal .modal-body {
+    padding: 22px;
+}
+
+.add-sheet-modal .modal-footer {
+    border-top: 1px solid var(--border);
+    padding: 14px 22px;
+}
+
+/* Delete confirmation */
+.delete-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.delete-confirm-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.delete-confirm-box {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+    transform: scale(0.9);
+    transition: transform 0.25s ease;
+}
+
+.delete-confirm-overlay.show .delete-confirm-box {
+    transform: scale(1);
+}
+
+.delete-confirm-box i {
+    font-size: 2.5rem;
+    color: #ef4444;
+    margin-bottom: 12px;
+}
+
+.delete-confirm-box h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.delete-confirm-box p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.delete-confirm-box .btn-group-confirm {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.delete-confirm-box .btn-group-confirm .btn {
+    padding: 8px 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 8px;
+}
+
+/* Status indicator */
+.config-save-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #22c55e;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.config-save-indicator.show {
+    opacity: 1;
+}
+
+/* Empty state */
+.config-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+}
+
+.config-empty i {
+    font-size: 3rem;
+    opacity: 0.3;
+    display: block;
+    margin-bottom: 12px;
+}
+
+.config-empty h5 {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+/* Column format info box */
+.column-format-info {
+    background: linear-gradient(135deg, #eff6ff 0%, #f0f4ff 100%);
+    border: 1px solid #c7d2fe;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 0 28px 20px;
+}
+
+.column-format-info h5 {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.column-format-info .format-examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.column-format-info .format-example {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+}
+
+.column-format-info .format-example code {
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--accent);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.76rem;
+    font-weight: 600;
+}
+
+.column-format-info .format-example span {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+}
+
+/* Responsive */
+@media (max-width: 991.98px) {
+    .config-grid {
+        grid-template-columns: 1fr;
+        padding: 0 16px 16px;
+    }
+
+    .settings-header {
+        padding: 20px 16px 14px;
+    }
+
+    .settings-toolbar {
+        padding: 0 16px 12px;
+    }
+
+    .column-format-info {
+        margin: 0 16px 14px;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .config-row {
+        grid-template-columns: 1fr;
+    }
+
+    .settings-header h1 {
+        font-size: 1.15rem;
+    }
+}

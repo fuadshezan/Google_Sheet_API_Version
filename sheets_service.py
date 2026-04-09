@@ -41,6 +41,21 @@ def _load_config():
         return {}
 
 
+def _save_config(config):
+    """Save sheet config to sheets_config.json."""
+    try:
+        # Add back the comment key for documentation
+        save_data = {
+            "_comment": "Sheet-wise configuration. header_row = which row has column headers (1-based). columns = column range to read (e.g. 'A:F', 'A,C,E', 'A:C,E,G:J'). visible = show in frontend (default true). roles = which roles can access ['admin','moderator'] (default all roles).",
+        }
+        save_data.update(config)
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(save_data, f, indent=4)
+        print(f"  CONFIG: Saved to {CONFIG_FILE}")
+    except OSError as e:
+        raise ConnectionError(f"Could not write sheets_config.json: {e}")
+
+
 def _col_letter_to_index(letter):
     """Convert column letter to 0-based index. e.g. 'A'->0, 'F'->5, 'R'->17."""
     result = 0
@@ -51,19 +66,38 @@ def _col_letter_to_index(letter):
 
 def _parse_column_range(col_range):
     """
-    Parse a column range string like 'A:F' into (start_index, end_index).
-    Both are 0-based. Returns None if input is None (meaning all columns).
+    Parse a column specification string into a sorted list of 0-based column indices.
+    Supports three formats:
+      - 'A:F'       → contiguous range [0,1,2,3,4,5]
+      - 'A,C,D,E,F' → discrete columns [0,2,3,4,5]
+      - 'A:C,E,G:J' → mixed ranges and discrete [0,1,2,4,6,7,8,9]
+    Returns None if input is None or empty (meaning all columns).
     """
     if not col_range:
         return None
 
-    parts = col_range.upper().split(":")
-    if len(parts) != 2:
+    col_range = col_range.strip().upper()
+    if not col_range:
         return None
 
-    start = _col_letter_to_index(parts[0])
-    end = _col_letter_to_index(parts[1])
-    return (start, end)
+    indices = set()
+    # Split by comma first to get segments
+    segments = [s.strip() for s in col_range.split(",") if s.strip()]
+
+    for segment in segments:
+        if ":" in segment:
+            # Range like 'A:F'
+            parts = segment.split(":")
+            if len(parts) == 2 and parts[0] and parts[1]:
+                start = _col_letter_to_index(parts[0])
+                end = _col_letter_to_index(parts[1])
+                for i in range(start, end + 1):
+                    indices.add(i)
+        else:
+            # Single column like 'A' or 'C'
+            indices.add(_col_letter_to_index(segment))
+
+    return sorted(indices) if indices else None
 
 
 class SheetsService:
@@ -135,7 +169,7 @@ class SheetsService:
         """
         cfg = self._get_config(sheet_name)
         header_row = cfg["header_row"]
-        col_range = _parse_column_range(cfg["columns"])
+        col_indices = _parse_column_range(cfg["columns"])
         image_col_names = cfg.get("image_columns", [])
 
         try:
@@ -160,11 +194,13 @@ class SheetsService:
         header_row_data = all_values[header_row - 1]
         data_rows = all_values[header_row:]  # Everything after header row
 
-        # Apply column range filter
-        if col_range:
-            start, end = col_range
-            headers = header_row_data[start: end + 1]
-            rows = [row[start: end + 1] for row in data_rows]
+        # Apply column filter (list of 0-based indices)
+        if col_indices:
+            headers = [header_row_data[i] if i < len(header_row_data) else "" for i in col_indices]
+            rows = [
+                [row[i] if i < len(row) else "" for i in col_indices]
+                for row in data_rows
+            ]
         else:
             headers = header_row_data
             rows = data_rows
@@ -191,15 +227,21 @@ class SheetsService:
                     formula_header = all_formulas[header_row - 1] if header_row <= len(all_formulas) else []
                     formula_rows = all_formulas[header_row:] if header_row <= len(all_formulas) else []
 
-                    # Apply same column range filter to formulas
-                    if col_range:
-                        formula_rows = [row[start: end + 1] for row in formula_rows]
+                    # Apply same column filter to formulas
+                    if col_indices:
+                        formula_rows = [
+                            [row[i] if i < len(row) else "" for i in col_indices]
+                            for row in formula_rows
+                        ]
 
                     # Filter empty rows in sync — rebuild using same non-empty logic
                     # We need to map original row indices to filtered ones
                     raw_data_rows = all_values[header_row:]
-                    if col_range:
-                        raw_filtered = [row[start: end + 1] for row in raw_data_rows]
+                    if col_indices:
+                        raw_filtered = [
+                            [row[i] if i < len(row) else "" for i in col_indices]
+                            for row in raw_data_rows
+                        ]
                     else:
                         raw_filtered = raw_data_rows
 
@@ -236,6 +278,37 @@ class SheetsService:
     def get_sheet_config(self):
         """Return the full sheet config dict (for API exposure)."""
         return self.config
+
+    def reload_config(self):
+        """Re-read sheets_config.json from disk and replace in-memory config."""
+        self.config = _load_config()
+        print("  CONFIG: Reloaded sheets_config.json")
+
+    def update_config(self, new_config):
+        """
+        Replace the full config, save to disk, and update in-memory.
+        new_config: dict of sheet configs (without _comment keys).
+        """
+        _save_config(new_config)
+        self.config = new_config
+        print("  CONFIG: Updated and saved sheets_config.json")
+
+    def update_sheet_config(self, sheet_name, sheet_cfg):
+        """
+        Update config for a single sheet, save to disk, and update in-memory.
+        """
+        self.config[sheet_name] = sheet_cfg
+        _save_config(self.config)
+        print(f"  CONFIG: Updated config for '{sheet_name}'")
+
+    def delete_sheet_config(self, sheet_name):
+        """
+        Remove config for a single sheet, save to disk, and update in-memory.
+        """
+        if sheet_name in self.config:
+            del self.config[sheet_name]
+            _save_config(self.config)
+            print(f"  CONFIG: Deleted config for '{sheet_name}'")
 
     def get_worksheet(self, sheet_name):
         """Return the raw gspread worksheet object."""

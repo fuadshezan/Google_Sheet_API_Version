@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Aesthetico Dashboard</title>
+    <meta name="description" content="Admin settings page for managing sheet configurations">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="/static/css/sheet-common.css">
+    <link rel="stylesheet" href="/static/css/settings.css">
+</head>
+<body>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner-box">
+            <div class="spinner-border text-primary" style="width:2.5rem;height:2.5rem;" role="status"></div>
+            <p id="loadingText">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Mobile Topbar -->
+    <header class="mobile-topbar d-print-none">
+        <button class="hamburger" id="hamburger" aria-label="Toggle navigation">
+            <span></span><span></span><span></span>
+        </button>
+        <a href="/" class="mobile-topbar-brand">
+            <div class="brand-icon"><i class="bi bi-bar-chart-line-fill"></i></div>
+            <span class="brand-name">Aesthetico</span>
+        </a>
+        <span class="mobile-topbar-title">Settings</span>
+    </header>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar d-print-none">
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-icon"><i class="bi bi-bar-chart-line-fill"></i></div>
+            <div class="sidebar-brand-text">
+                <span class="brand-name">Aesthetico</span>
+                <span class="brand-sub">Order Management</span>
+            </div>
+        </div>
+        <div class="sidebar-section-label">Navigation</div>
+        <nav id="sheetList"></nav>
+        <div class="sidebar-user">
+            <div class="sidebar-user-info">
+                <div class="user-avatar" id="userAvatar">A</div>
+                <div>
+                    <div class="sidebar-user-name" id="userName">User</div>
+                    <span id="userRole" class="badge bg-info" style="font-size:0.68rem;">Role</span>
+                </div>
+            </div>
+            <button onclick="auth.logout()" class="btn-logout">
+                <i class="bi bi-box-arrow-right"></i> Logout
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Page Header -->
+        <div class="settings-header">
+            <h1><i class="bi bi-gear-fill"></i> Sheet Configuration</h1>
+            <p>Manage sheet settings, column visibility, and role-based access. Changes take effect immediately.</p>
+        </div>
+
+        <!-- Column Format Info -->
+        <div class="column-format-info">
+            <h5><i class="bi bi-lightbulb-fill"></i> Column Format Guide</h5>
+            <div class="format-examples">
+                <div class="format-example">
+                    <code>A:R</code> <span>Contiguous range (A through R)</span>
+                </div>
+                <div class="format-example">
+                    <code>A,C,D,E,F</code> <span>Specific columns only</span>
+                </div>
+                <div class="format-example">
+                    <code>A:C,E,G:J</code> <span>Mixed ranges &amp; single columns</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="settings-toolbar">
+            <div class="d-flex align-items-center gap-2">
+                <span id="sheetCount" class="text-muted" style="font-size:0.82rem;"></span>
+            </div>
+            <button class="btn btn-add-sheet" id="btnAddSheet">
+                <i class="bi bi-plus-lg"></i> Add Sheet Config
+            </button>
+        </div>
+
+        <!-- Config Cards Grid -->
+        <div id="configGrid" class="config-grid"></div>
+
+        <!-- Empty State -->
+        <div id="configEmpty" class="config-empty d-none">
+            <i class="bi bi-gear"></i>
+            <h5>No Sheet Configurations</h5>
+            <p>Add a sheet configuration to get started.</p>
+        </div>
+    </main>
+
+    <!-- Add Sheet Modal -->
+    <div class="modal fade add-sheet-modal" id="addSheetModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Add Sheet Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="config-field mb-3">
+                        <label for="newSheetName">Sheet Name</label>
+                        <input type="text" id="newSheetName" placeholder="e.g. Expenses, Product Purchase">
+                        <div class="field-hint">Must match the exact tab name in your Google Sheet.</div>
+                    </div>
+                    <div class="config-row mb-3">
+                        <div class="config-field">
+                            <label for="newHeaderRow">Header Row</label>
+                            <input type="number" id="newHeaderRow" value="1" min="1">
+                        </div>
+                        <div class="config-field">
+                            <label for="newColumns">Columns</label>
+                            <input type="text" id="newColumns" placeholder="e.g. A:F or A,C,D,E">
+                        </div>
+                    </div>
+                    <div class="config-toggle mb-3">
+                        <input class="form-check-input" type="checkbox" id="newVisible" checked>
+                        <span class="toggle-label">Visible in frontend</span>
+                    </div>
+                    <div class="config-field">
+                        <label>Roles</label>
+                        <div class="roles-group">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="newRoleAdmin" value="admin" checked>
+                                <label class="form-check-label" for="newRoleAdmin">Admin</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="newRoleModerator" value="moderator">
+                                <label class="form-check-label" for="newRoleModerator">Moderator</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-save-sheet" id="btnConfirmAdd">
+                        <i class="bi bi-plus-lg"></i> Add Configuration
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Overlay -->
+    <div class="delete-confirm-overlay" id="deleteConfirmOverlay">
+        <div class="delete-confirm-box">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <h4>Delete Configuration?</h4>
+            <p>Are you sure you want to delete the config for <strong id="deleteSheetName"></strong>? This cannot be undone.</p>
+            <div class="btn-group-confirm">
+                <button class="btn btn-outline-secondary" id="btnCancelDelete">Cancel</button>
+                <button class="btn btn-danger" id="btnConfirmDelete">
+                    <i class="bi bi-trash3 me-1"></i>Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/common.js"></script>
+    <script src="/static/js/settings.js"></script>
+</body>
+</html>

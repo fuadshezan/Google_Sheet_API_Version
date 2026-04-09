@@ -1,6 +1,5 @@
 {
-    "_comment": "Sheet-wise configuration. header_row = which row has column headers (1-based). columns = column range to read (e.g. 'A:F'). visible = show in frontend (default true). roles = which roles can access ['admin','moderator'] (default all roles).",
-
+    "_comment": "Sheet-wise configuration. header_row = which row has column headers (1-based). columns = column range to read (e.g. 'A:F', 'A,C,E', 'A:C,E,G:J'). visible = show in frontend (default true). roles = which roles can access ['admin','moderator'] (default all roles).",
     "DASHBOARD": {
         "header_row": 3,
         "columns": "A:F",
@@ -10,47 +9,97 @@
         "header_row": 1,
         "columns": "A:O",
         "visible": true,
-        "roles": ["admin", "moderator"],
-        "image_columns": ["Product Image"],
+        "roles": [
+            "admin",
+            "moderator"
+        ],
+        "image_columns": [
+            "Product Image"
+        ],
         "role_columns": {
-            "moderator": ["Product ID", "Product Image", "Product Name", "Design", "Color", "Size ", "Selling Price", "Available Stock", "Display Name"]
+            "moderator": [
+                "Product ID",
+                "Product Image",
+                "Product Name",
+                "Design",
+                "Color",
+                "Size ",
+                "Selling Price",
+                "Available Stock",
+                "Display Name"
+            ]
         }
     },
     "Summary Inventory": {
         "header_row": 6,
         "columns": "A:F",
         "visible": true,
-        "roles": ["admin", "moderator"]
+        "roles": [
+            "admin",
+            "moderator"
+        ]
     },
     "Input Inventory": {
         "header_row": 1,
         "columns": "A:E",
         "visible": true,
-        "roles": ["admin"]
+        "roles": [
+            "admin"
+        ]
     },
     "Sales": {
         "header_row": 1,
         "columns": "A:R",
         "visible": true,
-        "roles": ["admin", "moderator"]
+        "roles": [
+            "admin",
+            "moderator"
+        ],
+        "role_columns": {
+            "admin": [
+                "Order ID",
+                "Date",
+                "Customer Name",
+                "Quantity",
+                "Discounted Price",
+                "Delivery Platform",
+                "Payable Amount",
+                "Order Status",
+                "Consignment ID"
+            ],
+            "moderator": [
+                "Order ID",
+                "Date",
+                "Customer Name",
+                "Payable Amount",
+                "Order Status",
+                "Consignment ID"
+            ]
+        }
     },
     "Sales Raw": {
         "header_row": 1,
         "columns": "A:O",
         "visible": true,
-        "roles": ["admin"]
+        "roles": [
+            "admin"
+        ]
     },
     "Expenses": {
         "header_row": 1,
         "columns": "A:E",
         "visible": true,
-        "roles": ["admin"]
+        "roles": [
+            "admin"
+        ]
     },
     "Product Purchase": {
         "header_row": 1,
         "columns": "A:J",
         "visible": true,
-        "roles": ["admin"]
+        "roles": [
+            "admin"
+        ]
     },
     "DashBoard Calculation": {
         "header_row": 3,
@@ -61,7 +110,10 @@
         "header_row": 1,
         "columns": "A:E",
         "visible": false,
-        "roles": ["admin", "moderator"]
+        "roles": [
+            "admin",
+            "moderator"
+        ]
     },
     "Reference Inventory": {
         "header_row": 1,
@@ -71,8 +123,11 @@
     "Information": {
         "header_row": 1,
         "columns": "A:C",
-        "visible": true,
-        "roles": ["admin", "moderator"]
+        "visible": false,
+        "roles": [
+            "admin",
+            "moderator"
+        ]
     },
     "UserName": {
         "header_row": 1,

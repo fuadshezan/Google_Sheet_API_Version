@@ -63,6 +63,15 @@ class InsertOrderRequest(BaseModel):
     products: List[ProductItem]
     sales: Sales
 
+class SheetConfigUpdate(BaseModel):
+    """Pydantic model for updating a single sheet's config."""
+    header_row: int = 1
+    columns: Optional[str] = None
+    visible: bool = True
+    roles: Optional[List[str]] = None
+    role_columns: Optional[dict] = None
+    image_columns: Optional[List[str]] = None
+
 #Create a dictionary for delivery charges based on the delivery platform
 delivery_charges = {
     "Pathao Inside": 70,
@@ -226,6 +235,17 @@ async def serve_sheet_page(sheet_file: str):
     raise HTTPException(status_code=404, detail="Sheet page not found")
 
 
+@app.get("/settings")
+async def settings_page():
+    """
+    Serve the settings page (admin only client‑side check).
+    This endpoint no longer requires the Authorization header, allowing the
+    browser to load the HTML file. The JavaScript on the page will verify the
+    user's role via the stored token and redirect non‑admin users.
+    """
+    return FileResponse(os.path.join(static_dir, "settings.html"))
+
+
 # ── Auth Endpoints ───────────────────────────────────────────────────────────
 
 @app.post("/api/login", response_model=LoginResponse)
@@ -301,6 +321,58 @@ async def get_config(user: dict = Depends(get_current_user)):
     return sheets.get_sheet_config()
 
 
+@app.put("/api/config")
+async def update_full_config(request: Request, user: dict = Depends(get_current_user)):
+    """Replace the entire sheets config (admin only). Hot-reloads immediately."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    try:
+        body = await request.json()
+        # Remove comment keys if present
+        clean = {k: v for k, v in body.items() if not k.startswith("_")}
+        sheets.update_config(clean)
+        return {"success": True, "message": "Config updated and reloaded."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update config: {e}")
+
+
+@app.put("/api/config/{sheet_name}")
+async def update_sheet_config(
+    sheet_name: str,
+    cfg: SheetConfigUpdate,
+    user: dict = Depends(get_current_user),
+):
+    """Update config for a single sheet (admin only). Hot-reloads immediately."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    try:
+        sheet_cfg = cfg.model_dump(exclude_none=True)
+        # Always include these fields even if default
+        sheet_cfg["header_row"] = cfg.header_row
+        sheet_cfg["visible"] = cfg.visible
+        sheets.update_sheet_config(sheet_name, sheet_cfg)
+        return {"success": True, "message": f"Config for '{sheet_name}' updated.", "config": sheet_cfg}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update config: {e}")
+
+
+@app.delete("/api/config/{sheet_name}")
+async def delete_sheet_config(
+    sheet_name: str,
+    user: dict = Depends(get_current_user),
+):
+    """Delete config for a single sheet (admin only)."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    if sheet_name not in sheets.get_sheet_config():
+        raise HTTPException(status_code=404, detail=f"Config for '{sheet_name}' not found.")
+    try:
+        sheets.delete_sheet_config(sheet_name)
+        return {"success": True, "message": f"Config for '{sheet_name}' deleted."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete config: {e}")
+
+
 @app.get("/api/sheets/{sheet_name}")
 async def get_sheet(
     sheet_name: str, 
@@ -316,21 +388,64 @@ async def get_sheet(
 
     try:
         data = sheets.get_sheet_data(sheet_name)
-
+        
         # Apply role-based column filtering
         filtered_headers, filtered_rows = sheets.filter_columns_for_role(
             sheet_name, role, data["headers"], data["rows"]
         )
-        
+    
         # Apply date filtering if requested and sheet is Sales
-        if sheet_name.strip().lower() == "sales" and (date_from or date_to):
+        is_sales = sheet_name.strip().lower() == "sales"
+        if is_sales and (date_from or date_to):
             filtered_rows = filter_by_date(filtered_headers, filtered_rows, date_from, date_to)
+            
+        # Merge Customer Contact from Sales Raw for Sales sheet
+        if is_sales:
+            try:
+                raw_data = sheets.get_sheet_data("Sales Raw")
+                if raw_data and "headers" in raw_data:
+                    raw_headers = raw_data["headers"]
+                    raw_rows = raw_data["rows"]
+                    
+                    # Find indices
+                    raw_order_idx = -1
+                    raw_contact_idx = -1
+                    for i, h in enumerate(raw_headers):
+                        h_lower = (h or "").lower().strip()
+                        if h_lower == "order id":
+                            raw_order_idx = i
+                        elif h_lower == "customer contact":
+                            raw_contact_idx = i
+                            
+                    sales_order_idx = -1
+                    for i, h in enumerate(filtered_headers):
+                        if (h or "").lower().strip() == "order id":
+                            sales_order_idx = i
+                            break
+                            
+                    if raw_order_idx >= 0 and raw_contact_idx >= 0 and sales_order_idx >= 0:
+                        phone_map = {}
+                        for r in raw_rows:
+                            if len(r) > max(raw_order_idx, raw_contact_idx):
+                                o_id = r[raw_order_idx]
+                                phone = r[raw_contact_idx]
+                                if o_id and (o_id not in phone_map or not phone_map[o_id].strip()):
+                                    phone_map[o_id] = phone
+                                    
+                        filtered_headers.append("Contact")
+                        for r in filtered_rows:
+                            o_id = r[sales_order_idx] if len(r) > sales_order_idx else None
+                            phone = phone_map.get(o_id, "") if o_id else ""
+                            # Append the phone number to the row
+                            r.append(phone)
+            except Exception as e:
+                print(f"Error merging Sales Raw contacts for Sales sheet: {e}")
         
         data["headers"] = filtered_headers
         data["rows"] = filtered_rows
-
         return data
     except KeyError as e:
+        print(f"  ERROR: Sheet '{sheet_name}' not found: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except ConnectionError as e:
         raise HTTPException(status_code=502, detail=str(e))
@@ -613,7 +728,7 @@ async def insert_sales_raw(req: InsertOrderRequest, user: dict = Depends(get_cur
             total_price_formula=f'=IF(OR(I{next_row+products}="", K{next_row+products}=""), "", I{next_row+products}*K{next_row+products})'
 
             # =IF(A232="","",XLOOKUP(A232,Sales!$A$2:A3664,Sales!$N$2:N3664))
-            order_status_formula=f'=IF(A{next_row+products}="","",XLOOKUP(A{next_row+products},Sales!$A$2:A3664,Sales!$M$2:M3664))'
+            order_status_formula=f'=IF(A{next_row+products}="","",XLOOKUP(A{next_row+products},Sales!$A$2:A3664,Sales!$N$2:N3664))'
 
             # =IF(H232="", "", XLOOKUP(H232, Inventory!A$2:A, Inventory!G$2:G, ""))
             purchase_price_formula=f'=IF(H{next_row+products}="", "", XLOOKUP(H{next_row+products}, Inventory!A$2:A, Inventory!G$2:G, ""))'

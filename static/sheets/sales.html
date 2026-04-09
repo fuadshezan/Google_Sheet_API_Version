@@ -53,8 +53,16 @@
             .filter-card { margin: 12px 16px 0; }
         }
 
-        @media (max-width: 575.98px) {
+        @media (max-width: 767.98px) {
             .filter-card { margin: 10px 12px 0; padding: 12px 14px; }
+            #dataTable td, #dataTable th {
+                font-size: 0.8rem;
+                padding: 0.4rem;
+            }
+            .mobile-actions-btn {
+                padding: 0.2rem 0.4rem;
+                font-size: 0.75rem;
+            }
         }
     </style>
 </head>
@@ -137,6 +145,12 @@
 
         <!-- Date Range Filter -->
         <div class="filter-card">
+            <div class="row g-2 align-items-end mb-2 d-md-none">
+                <div class="col-12">
+                    <label for="mobileSearch" class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Search Order</label>
+                    <input type="text" class="form-control form-control-sm" id="mobileSearch" placeholder="Contact, Name, or Order ID...">
+                </div>
+            </div>
             <div class="row g-2 align-items-end">
                 <div class="col-6 col-md-3">
                     <label for="dateFrom" class="form-label" style="font-size:0.78rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">From Date</label>
@@ -173,9 +187,34 @@
             <div id="tableWrapper" class="d-none">
                 <div class="table-responsive-wrapper">
                     <table id="dataTable" class="table table-striped table-hover table-sm mb-0">
-                        <thead><tr></tr></thead>
+                        <thead>
+                        <tr></tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
+                </div>
+            </div>
+            <!-- Mobile Card Container -->
+            <div id="mobileCards" class="d-none"></div>
+            <div id="mobileLoadMoreContainer" class="d-none text-center mt-3 mb-4">
+                <button id="btnLoadMoreMobile" class="btn btn-primary px-4 rounded-pill shadow-sm"><i class="bi bi-chevron-down me-2"></i>Load More</button>
+            </div>
+        </div>
+
+        <!-- Mobile Details Modal -->
+        <div class="modal fade" id="orderDetailsModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Order Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="orderDetailsBody">
+                        <!-- Populated via JS -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -200,6 +239,13 @@
             let currentDateFrom = null;
             let currentDateTo = null;
             let currentDataTable = null;
+            
+            // Mobile State
+            let mobileAllCardsData = [];
+            let mobileCardsVisibleCount = 0;
+            const MOBILE_CARDS_CHUNK_SIZE = 20;
+            let globalHeaders = [];
+            let globalRows = [];
 
             console.log("[SALES-INLINE] Script loaded");
 
@@ -213,99 +259,353 @@
                 "sales by"
             ];
 
-            // Render table
-            function renderTable(headers, rows, preservePage = false) {
-                console.log("[SALES-INLINE] Rendering table with", rows.length, "rows");
+// Render table (desktop)
+function renderTable(headers, rows, preservePage = false) {
+    console.log("[SALES-INLINE] Rendering table with", rows.length, "rows");
 
-                let currentPage = 0;
-                if (preservePage && currentDataTable) {
-                    currentPage = currentDataTable.page();
-                }
+    let currentPage = 0;
+    if (preservePage && currentDataTable) {
+        currentPage = currentDataTable.page();
+    }
 
-                if (currentDataTable) {
-                    currentDataTable.destroy();
-                    currentDataTable = null;
-                }
+    if (currentDataTable) {
+        currentDataTable.destroy();
+        currentDataTable = null;
+    }
 
-                const dataTable = document.getElementById("dataTable");
-                const thead = dataTable.querySelector("thead");
-                const tbody = dataTable.querySelector("tbody");
-                thead.innerHTML = "";
-                tbody.innerHTML = "";
+    const dataTable = document.getElementById("dataTable");
+    const thead = dataTable.querySelector("thead");
+    const tbody = dataTable.querySelector("tbody");
+    thead.innerHTML = "";
+    tbody.innerHTML = "";
 
-                // Find indices in original headers (before filtering)
-                const orderIdIdx       = headers.findIndex(h => h === "Order ID");
-                const consignmentIdIdx = headers.findIndex(h => h === "Consignment ID");
+    const orderIdIdx = headers.findIndex(h => (h||"").toLowerCase().trim() === "order id");
+    const consignmentIdIdx = headers.findIndex(h => (h||"").toLowerCase().trim() === "consignment id");
+    const statusIdx = headers.findIndex(h => (h||"").toLowerCase().trim() === "status");
 
-                // Filter headers to hide unwanted columns
-                const visibleColumnIndices = [];
-                const visibleHeaders = [];
-                headers.forEach((h, i) => {
-                    const headerLower = (h || "").toLowerCase().trim();
-                    if (!HIDDEN_COLUMNS.includes(headerLower)) {
-                        visibleHeaders.push(h);
-                        visibleColumnIndices.push(i);
-                    }
-                });
+    const DESKTOP_VISIBLE_COLUMNS = [
+        "order id",
+        "name",
+        "amount",
+        "status",
+        "platform",
+        "consignment id",
+        "contact",
+        "date"
+    ];
 
-                // Build header
-                const headerRow = document.createElement("tr");
-                visibleHeaders.forEach((h) => {
-                    const th = document.createElement("th");
-                    th.textContent = h || "(empty)";
-                    headerRow.appendChild(th);
-                });
-                const actionsHeader = document.createElement("th");
-                actionsHeader.textContent = "Actions";
-                actionsHeader.style.width = "100px";
-                headerRow.appendChild(actionsHeader);
-                thead.appendChild(headerRow);
+    const visibleColumnIndices = [];
+    const visibleHeaders = [];
+    headers.forEach((h, i) => {
+        const headerLower = (h || "").toLowerCase().trim();
+        if (DESKTOP_VISIBLE_COLUMNS.includes(headerLower)) {
+            visibleHeaders.push(h);
+            visibleColumnIndices.push(i);
+        }
+    });
 
-                // Build body
-                rows.forEach((row) => {
-                    const tr = document.createElement("tr");
-                    visibleColumnIndices.forEach((i) => {
-                        const td = document.createElement("td");
-                        td.textContent = row[i] !== undefined ? row[i] : "";
-                        tr.appendChild(td);
-                    });
+    window.currentOrderRows = [];
 
-                    const actionsTd    = document.createElement("td");
-                    const orderId      = orderIdIdx >= 0 ? row[orderIdIdx] : null;
-                    const consignmentId = consignmentIdIdx >= 0 ? row[consignmentIdIdx] : null;
+    // Header
+    const headerRow = document.createElement("tr");
+    visibleHeaders.forEach(h => {
+        const th = document.createElement("th");
+        th.textContent = h || "(empty)";
+        th.style.color = "#475569";
+        th.style.fontWeight = "600";
+        th.style.fontSize = "10px";
+        th.style.textAlign = "center";
+        th.style.verticalAlign = "middle";
+        headerRow.appendChild(th);
+    });
+    const actionsHeader = document.createElement("th");
+    actionsHeader.textContent = "Actions";
+    actionsHeader.style.width = "100px";
+    actionsHeader.style.color = "#475569";
+    actionsHeader.style.fontWeight = "600";
+    actionsHeader.style.fontSize = "10px";
+    actionsHeader.style.textAlign = "center";
+    actionsHeader.style.verticalAlign = "middle";
+    headerRow.appendChild(actionsHeader);
+    thead.appendChild(headerRow);
 
-                    if (consignmentId && consignmentId.trim() !== "") {
-                        const updateBtn = document.createElement("button");
-                        updateBtn.className = "btn btn-sm btn-outline-primary";
-                        updateBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
-                        updateBtn.title = "Update Status";
-                        updateBtn.onclick = () => updateSingleStatus(orderId);
-                        actionsTd.appendChild(updateBtn);
-                    }
-                    tr.appendChild(actionsTd);
-                    tbody.appendChild(tr);
-                });
+    // Body
+    const displayRows = [...rows].reverse();
+    displayRows.forEach((row, rowIndex) => {
+        const tr = document.createElement("tr");
+        tr.style.verticalAlign = "middle";
+        
+        let detailsHtml = '<table class="table table-sm table-bordered"><tbody>';
+        headers.forEach((h, i) => {
+            const val = row[i] || "";
+            detailsHtml += `<tr><th style="width: 40%; background-color: #f8fafc; color: #475569;">${h}</th><td>${val}</td></tr>`;
+        });
+        detailsHtml += '</tbody></table>';
+        
+        const originalRowIndex = window.currentOrderRows.length;
+        window.currentOrderRows.push({ detailsHtml });
 
-                document.getElementById("emptyState").classList.add("d-none");
-                document.getElementById("tableWrapper").classList.remove("d-none");
-
-                currentDataTable = new DataTable("#dataTable", {
-                    pageLength: 25,
-                    lengthMenu: [10, 25, 50, 100],
-                    order: [],
-                    scrollX: true,
-                    columnDefs: [{ targets: -1, orderable: false }]
-                });
-
-                if (preservePage && currentPage > 0) {
-                    currentDataTable.page(currentPage).draw('page');
-                }
-
-                document.getElementById("sheetInfo").textContent = `${rows.length} rows, ${visibleHeaders.length} columns`;
-                updateFilterInfo();
-
-                console.log("[SALES-INLINE] Table rendered successfully");
+        visibleColumnIndices.forEach((colIdx, listIdx) => {
+            const td = document.createElement("td");
+            const val = row[colIdx] !== undefined ? row[colIdx] : "";
+            const hLower = visibleHeaders[listIdx].toLowerCase().trim();
+            
+            if (colIdx === statusIdx) {
+                const statusStyle = getStatusStyle(val);
+                td.innerHTML = `<span class="badge" style="${statusStyle} border-radius: 12px; font-size: 10px; font-weight: 500; padding: 6px 12px;">${val || '-'}</span>`;
+            } else if (hLower === "order id") {
+                td.innerHTML = `<span style="font-size: 10px; font-weight: 600; color: #1e293b;">${val || '-'}</span>`;
+            } else if (hLower === "customer name") {
+                const initials = getInitials(val);
+                td.innerHTML = `
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <!-- <div class="shadow-sm" style="width: 24px; height: 24px; border-radius: 50%; background-color: #334155; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 600; flex-shrink: 0;">${initials}</div> -->
+                        <span style="font-size: 10px; font-weight: 500; color: #334155;">${val || '-'}</span>
+                    </div>
+                `;
+            } else {
+                td.innerHTML = `<span style="font-size: 10px; font-weight: 500; color: #475569;">${val || '-'}</span>`;
             }
+            tr.appendChild(td);
+        });
+
+        const actionsTd = document.createElement("td");
+        actionsTd.innerHTML = `
+            <div class="d-flex gap-1 justify-content-center align-items-center">
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.showOrderDetails(${originalRowIndex})" title="View Details" style="border-radius: 8px;"><i class="bi bi-eye"></i></button>
+            </div>
+        `;
+        const orderId = orderIdIdx >= 0 ? row[orderIdIdx] : null;
+        const consignmentId = consignmentIdIdx >= 0 ? row[consignmentIdIdx] : null;
+        if (consignmentId && consignmentId.trim() !== "") {
+            const updateBtn = document.createElement("button");
+            updateBtn.className = "btn btn-sm btn-outline-primary";
+            updateBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
+            updateBtn.title = "Update Status";
+            updateBtn.style.borderRadius = "8px";
+            updateBtn.onclick = () => updateSingleStatus(orderId);
+            actionsTd.querySelector(".d-flex").appendChild(updateBtn);
+        }
+        
+        tr.appendChild(actionsTd);
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById("emptyState").classList.add("d-none");
+    document.getElementById("tableWrapper").classList.remove("d-none");
+    document.getElementById("mobileCards").classList.add("d-none");
+    
+    document.getElementById("tableWrapper").style.cssText = "background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; margin-top: 16px;";
+
+    currentDataTable = new DataTable("#dataTable", {
+        pageLength: 25,
+        lengthMenu: [10, 25, 50, 100],
+        order: [],
+        scrollX: true,
+        columnDefs: [{ targets: -1, orderable: false }]
+    });
+
+    if (preservePage && currentPage > 0) {
+        currentDataTable.page(currentPage).draw('page');
+    }
+
+    document.getElementById("sheetInfo").textContent = `${rows.length} rows, ${visibleHeaders.length} columns`;
+    updateFilterInfo();
+    console.log("[SALES-INLINE] Table rendered successfully");
+}
+
+const MOBILE_VISIBLE_COLUMNS = [
+    "order id",
+    "customer name",
+    "payable amount",
+    "order status"
+];
+
+// Helper to show modal with all details
+window.showOrderDetails = function(index) {
+    const detailsHtml = window.currentOrderRows[index].detailsHtml;
+    document.getElementById('orderDetailsBody').innerHTML = detailsHtml;
+    const modal = new bootstrap.Modal(document.getElementById('orderDetailsModal'));
+    modal.show();
+};
+
+function getInitials(name) {
+    if (!name) return "U";
+    const parts = name.trim().split(" ");
+    if (parts.length > 1) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+}
+
+function getStatusStyle(status) {
+    const s = (status || "").toLowerCase();
+    if (s.includes("progress")) return "background-color: #f3e8ff; color: #a855f7;";
+    if (s.includes("complete") || s.includes("delivered")) return "background-color: #dcfce7; color: #22c55e;";
+    if (s.includes("pending")) return "background-color: #e0f2fe; color: #3b82f6;";
+    if (s.includes("approved")) return "background-color: #fef3c7; color: #eab308;";
+    return "background-color: #f1f5f9; color: #64748b;";
+}
+
+// Function that renders the chunks of mobileCards
+function renderMobileCardsChunk() {
+    const mobileCards = document.getElementById("mobileCards");
+    const end = Math.min(mobileCardsVisibleCount + MOBILE_CARDS_CHUNK_SIZE, mobileAllCardsData.length);
+    
+    for (let i = mobileCardsVisibleCount; i < end; i++) {
+        const cardData = mobileAllCardsData[i];
+        
+        let updateBtnHtml = "";
+        if (cardData.consignmentId && cardData.consignmentId.trim() !== "") {
+            updateBtnHtml = `<button class="btn btn-sm btn-outline-primary" onclick="updateSingleStatus('${cardData.orderId}')" style="border-radius: 8px; font-weight: 500; font-size: 0.8rem; padding: 5px 12px;"><i class="bi bi-arrow-repeat"></i> Update</button>`;
+        }
+
+        const initials = getInitials(cardData.customer);
+        const statusStyle = getStatusStyle(cardData.status);
+
+        const card = document.createElement("div");
+        card.className = "card order-card";
+        card.style.cssText = "border: none; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; margin-bottom: 16px; padding: 18px; background: #fff;";
+
+        card.innerHTML = `
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-bold" style="font-size: 1.05rem; color: #1e293b;">${cardData.orderId || '-'}</h6>
+                <span class="badge" style="${statusStyle} border-radius: 12px; font-weight: 500; padding: 6px 12px;">${cardData.status || '-'}</span>
+            </div>
+            
+            <!-- Body -->
+            <div class="d-flex flex-column gap-2 mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted" style="font-size: 0.85rem; font-weight: 500;">Name</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- <div class="shadow-sm" style="width: 24px; height: 24px; border-radius: 50%; background-color: #334155; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 600;">${initials}</div> -->
+                        <span style="font-size: 0.9rem; font-weight: 600; color: #334155;">${cardData.customer || '-'}</span>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted" style="font-size: 0.85rem; font-weight: 500;">Amount</span>
+                    <span style="font-size: 0.9rem; font-weight: 600; color: #334155;">${cardData.amount || '-'}</span>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted" style="font-size: 0.85rem; font-weight: 500;">Contact</span>
+                    <span style="font-size: 0.9rem; font-weight: 600; color: #334155;">${cardData.phone || '-'}</span>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted" style="font-size: 0.85rem; font-weight: 500;">Date</span>
+                    <span style="font-size: 0.9rem; font-weight: 600; color: #334155;">${cardData.date || '-'}</span>
+                </div>
+            </div>
+            
+            <!-- Footer Actions -->
+            <div class="d-flex justify-content-between align-items-center" style="border-top: 1px solid #f1f5f9; padding-top: 14px;">
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.showOrderDetails(${cardData.originalRowIndex})" style="border-radius: 8px; font-weight: 500; font-size: 0.8rem; padding: 5px 12px;"><i class="bi bi-eye"></i> View Details</button>
+                ${updateBtnHtml}
+            </div>
+        `;
+        mobileCards.appendChild(card);
+    }
+    
+    mobileCardsVisibleCount = end;
+    
+    const loadMoreContainer = document.getElementById("mobileLoadMoreContainer");
+    if (mobileCardsVisibleCount < mobileAllCardsData.length) {
+        loadMoreContainer.classList.remove("d-none");
+    } else {
+        loadMoreContainer.classList.add("d-none");
+    }
+}
+
+// Render mobile cards instead of table
+function renderMobileCards(headers, rows, preservePage = false) {
+    console.log("[SALES-INLINE] Rendering mobile cards", rows.length, "rows");
+
+    const mobileCards = document.getElementById("mobileCards");
+    mobileCards.innerHTML = "";
+    
+    const mobileSearchEl = document.getElementById("mobileSearch");
+    const searchTerm = mobileSearchEl ? mobileSearchEl.value.toLowerCase().trim() : "";
+
+    const orderIdIdx = headers.findIndex(h => (h||"").toLowerCase().trim() === "order id");
+    const statusIdx = headers.findIndex(h => (h||"").toLowerCase().trim() === "status");
+    const customerIdx = headers.findIndex(h => (h||"").toLowerCase().trim() === "name");
+    const amountIdx = headers.findIndex(h => (h||"").toLowerCase().trim() === "amount");
+    const dateIdx = headers.findIndex(h => (h||"").toLowerCase().trim() === "date");
+    const consignmentIdIdx = headers.findIndex(h => (h||"").toLowerCase().trim() === "consignment id");
+    
+    const phoneIdx = headers.findIndex(h => {
+        const hLow = (h||"").toLowerCase().trim();
+        return hLow.includes("phone") || hLow.includes("mobile") || hLow.includes("contact");
+    });
+    const platformIdx = headers.findIndex(h => (h||"").toLowerCase().trim() === "platform");
+
+    window.currentOrderRows = [];
+    mobileAllCardsData = [];
+
+    rows.forEach((row, rowIndex) => {
+        const orderId = orderIdIdx >= 0 ? (row[orderIdIdx]||"").toString() : "#-";
+        const status = statusIdx >= 0 ? (row[statusIdx]||"").toString() : "Unknown";
+        const customer = customerIdx >= 0 ? (row[customerIdx]||"").toString() : "Unknown";
+        
+        let phone = "-";
+        if (phoneIdx >= 0 && row[phoneIdx]) phone = row[phoneIdx].toString();
+        else if (platformIdx >= 0 && row[platformIdx]) phone = row[platformIdx].toString();
+        
+        if (searchTerm) {
+            const match = orderId.toLowerCase().includes(searchTerm) || 
+                          customer.toLowerCase().includes(searchTerm) || 
+                          phone.toLowerCase().includes(searchTerm);
+            if (!match) return;
+        }
+
+        const amount = amountIdx >= 0 ? row[amountIdx] : "-";
+        const date = dateIdx >= 0 ? row[dateIdx] : "-";
+        const consignmentId = consignmentIdIdx >= 0 ? row[consignmentIdIdx] : null;
+
+        let detailsHtml = '<table class="table table-sm table-bordered"><tbody>';
+        headers.forEach((h, i) => {
+            const headerLower = (h || "").toLowerCase().trim();
+            if (!HIDDEN_COLUMNS.includes(headerLower)) {
+                detailsHtml += `<tr><th>${h}</th><td>${row[i] || ""}</td></tr>`;
+            }
+        });
+        detailsHtml += '</tbody></table>';
+        
+        const originalRowIndex = window.currentOrderRows.length;
+        window.currentOrderRows.push({ detailsHtml });
+
+        mobileAllCardsData.push({
+            orderId, status, customer, amount, phone, date, consignmentId, originalRowIndex
+        });
+    });
+    
+    // Reverse it to show newest on top
+    mobileAllCardsData.reverse();
+    mobileCardsVisibleCount = 0;
+    
+    renderMobileCardsChunk();
+
+    document.getElementById("emptyState").classList.add("d-none");
+    document.getElementById("tableWrapper").classList.add("d-none");
+    document.getElementById("mobileCards").classList.remove("d-none");
+
+    document.getElementById("sheetInfo").textContent = `${mobileAllCardsData.length} records found`;
+    updateFilterInfo();
+}
+
+// Unified render based on viewport
+function renderData(headers, rows, preservePage = false) {
+    const isMobile = window.innerWidth <= 767.98;
+    if (isMobile) {
+        renderMobileCards(headers, rows, preservePage);
+    } else {
+        renderTable(headers, rows, preservePage);
+    }
+}
+
 
             function updateFilterInfo() {
                 const filterInfoEl = document.getElementById("filterInfo");
@@ -328,7 +628,7 @@
                 }
             }
 
-            function updateSingleStatus(orderId) {
+            window.updateSingleStatus = function(orderId) {
                 console.log("[SALES-INLINE] Updating status for:", orderId);
                 const token = localStorage.getItem('auth_token');
 
@@ -370,7 +670,23 @@
                 })
                 .then(data => {
                     console.log(`[SALES-INLINE] Received ${data.rows.length} rows`);
-                    renderTable(data.headers, data.rows, preservePage);
+                    
+                    const headerMap = {
+                        "customer name": "Name",
+                        "delivery platform": "Platform",
+                        "payable amount": "Amount",
+                        "order status": "Status",
+                        "customer contact": "Contact"
+                    };
+                    
+                    data.headers = data.headers.map(h => {
+                        const hLow = (h || "").toLowerCase().trim();
+                        return headerMap[hLow] || h;
+                    });
+
+                    globalHeaders = data.headers;
+                    globalRows = data.rows;
+                    renderData(data.headers, data.rows, preservePage);
                     ui.hideLoading();
                 })
                 .catch(err => {
@@ -402,6 +718,14 @@
                     currentDateTo   = document.getElementById("dateTo").value || null;
                     loadSalesData();
                 });
+                // Re‑render on window resize (debounced)
+                let resizeTimeout;
+                window.addEventListener('resize', () => {
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(() => {
+                        loadSalesData(true);
+                    }, 250);
+                });
                 document.getElementById("btnClearFilter").addEventListener("click", () => {
                     document.getElementById("dateFrom").value = "";
                     document.getElementById("dateTo").value   = "";
@@ -411,6 +735,18 @@
                 });
 
                 ui.showForRole("btnUpdate", "admin");
+                
+                document.getElementById("btnLoadMoreMobile").addEventListener("click", () => {
+                    renderMobileCardsChunk();
+                });
+
+                document.getElementById("mobileSearch").addEventListener("input", () => {
+                    if (window.innerWidth <= 767.98) {
+                        if (globalHeaders.length > 0 && globalRows.length > 0) {
+                            renderMobileCards(globalHeaders, globalRows, false);
+                        }
+                    }
+                });
 
                 console.log("[SALES-INLINE] Init complete");
             }
